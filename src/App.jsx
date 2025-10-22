@@ -4,6 +4,7 @@ import CloudCounter from './CloudCounter.jsx';
 import Leaderboard from './Leaderboard.jsx';
 import Compass from './Compass.jsx';
 import RegistrationModal from './RegistrationModal.jsx';
+import InfoModal from './InfoModal.jsx'; // Import the new modal
 
 const styles = {
   app: {
@@ -84,6 +85,7 @@ function App() {
   const [clouds, setClouds] = useState(10);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false); // New state for info modal
   const [zoom, setZoom] = useState(10);
   const mapRef = useRef(null);
   const particlesRef = useRef(null);
@@ -145,7 +147,7 @@ function App() {
   };
 
   const handleInfoClick = () => {
-    alert('Chill Map: Click on the map to leave a cloud. Find your location with the compass.');
+    setIsInfoModalOpen(true); // Open the info modal
   };
 
   return (
@@ -181,6 +183,10 @@ function App() {
 
       {isLeaderboardOpen && (
         <Leaderboard onClose={() => setIsLeaderboardOpen(false)} />
+      )}
+
+      {isInfoModalOpen && (
+        <InfoModal onClose={() => setIsInfoModalOpen(false)} />
       )}
     </div>
   );
