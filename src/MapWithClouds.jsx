@@ -1,17 +1,11 @@
-import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import { GoogleMap, LoadScript } from "@react-google-maps/api";
-import Particles from "react-particles";
-import { particlesOptions } from "./cloud-particles-config.jsx";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 
 const GRID_SIZE = 0.0005;
 
 const mapContainerStyle = { width: "100%", height: "100%" };
 const center = { lat: 25.0330, lng: 121.5654 };
-const particlesStyle = {
-  position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
-  zIndex: 200, pointerEvents: "none",
-};
 const mapRootStyle = {
   position: 'absolute', inset: '0px', width: '100%', height: '100%',
 };
@@ -23,33 +17,15 @@ const mapStyles = [
   { featureType: "landscape.natural", elementType: "labels", stylers: [{ visibility: "off" }] },
 ];
 
-const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoomChanged }, ref) => {
+// This component is now much simpler. It only deals with the map and the grid overlay.
+// All particle logic has been lifted up to App.jsx.
+const MapWithClouds = ({ onClaimCell, claimedCells, setMapRef, onZoomChanged }) => {
   const [hoveredCell, setHoveredCell] = useState(null);
   const [zoom, setZoom] = useState(18);
-  const [mapInstance, setMapInstance] = useState(null); // State to hold the map instance
-  const particlesContainerRef = useRef(null);
-
-  const onParticlesLoaded = useCallback(container => {
-    particlesContainerRef.current = container;
-  }, []);
-
-  useImperativeHandle(ref, () => ({
-    triggerParticles(lat, lng) {
-      if (particlesContainerRef.current && mapInstance) {
-        const projection = mapInstance.getProjection();
-        if (!projection) return;
-        const domPoint = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(lat, lng));
-        if (domPoint) {
-          particlesContainerRef.current.addEmitter({
-            position: { x: domPoint.x, y: domPoint.y },
-          });
-        }
-      }
-    }
-  }));
+  const [mapInstance, setMapInstance] = useState(null);
 
   const handleMapLoad = useCallback((map) => {
-    setMapInstance(map); // Save the map instance to state
+    setMapInstance(map);
     setMapRef(map);
     setZoom(map.getZoom());
   }, [setMapRef]);
@@ -67,7 +43,6 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
       if (hoveredCell) setHoveredCell(null);
       return;
     }
-    // Use integer-based key to avoid float precision issues.
     const key = `${Math.floor(e.latLng.lat() / GRID_SIZE)}_${Math.floor(e.latLng.lng() / GRID_SIZE)}`;
     if (key !== hoveredCell) setHoveredCell(key);
   };
@@ -81,21 +56,21 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
 
-    // Use integer-based key to avoid float precision issues.
-    const key = `${Math.floor(lat / GRID_SIZE)}_${Math.floor(lng / GRID_SIZE)}`;
+    const iy = Math.floor(lat / GRID_SIZE);
+    const ix = Math.floor(lng / GRID_SIZE);
+    const key = `${iy}_${ix}`;
     
-    // Calculate center for the particle effect.
-    const south = Math.floor(lat / GRID_SIZE) * GRID_SIZE;
-    const west = Math.floor(lng / GRID_SIZE) * GRID_SIZE;
+    const south = iy * GRID_SIZE;
+    const west = ix * GRID_SIZE;
     const centerLat = south + GRID_SIZE / 2;
     const centerLng = west + GRID_SIZE / 2;
 
+    // Pass all necessary info up to the App component.
     onClaimCell(key, centerLat, centerLng);
   };
 
   return (
     <div style={mapRootStyle}>
-      <Particles id="tsparticles" options={particlesOptions} onLoaded={onParticlesLoaded} style={particlesStyle} />
       <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
@@ -112,23 +87,16 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
           onMouseOut={handleMouseOut}
           onClick={handleClick}
         >
-          {/* The new CanvasOverlay receives the map instance and handles all drawing */}
           <CanvasOverlay
             map={mapInstance}
             zoom={zoom}
             claimedCells={claimedCells}
             hoveredCell={hoveredCell}
           />
-
-          {/* 
-            We no longer need to render Markers here. 
-            The CanvasOverlay is now responsible for drawing the claimed cells.
-            This is much more performant.
-          */}
         </GoogleMap>
       </LoadScript>
     </div>
   );
-});
+};
 
 export default MapWithClouds;

@@ -89,7 +89,6 @@ function App() {
   const [zoom, setZoom] = useState(10);
   const [claimedCells, setClaimedCells] = useState({});
   const mapRef = useRef(null);
-  const particlesRef = useRef(null);
 
   const handleClaimCell = (cellKey, centerLat, centerLng) => {
     if (clouds > 0) {
@@ -98,9 +97,7 @@ function App() {
         ...prev,
         [cellKey]: { owner: 'user', color: '#3B82F6' }
       }));
-      if (particlesRef.current) {
-        particlesRef.current.triggerParticles(centerLat, centerLng);
-      }
+      // The particle trigger call has been removed.
     } else {
       setIsModalOpen(true);
     }
@@ -158,7 +155,6 @@ function App() {
   return (
     <div style={styles.app}>
       <MapWithClouds 
-        ref={particlesRef}
         onClaimCell={handleClaimCell}
         claimedCells={claimedCells}
         setMapRef={(map) => { mapRef.current = map; }}

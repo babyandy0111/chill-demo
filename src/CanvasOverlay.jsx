@@ -12,7 +12,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
   useEffect(() => {
     if (!map) return;
 
-    class IntegerBasedOverlay extends window.google.maps.OverlayView {
+    class FinalCorrectedOverlay extends window.google.maps.OverlayView {
       constructor() {
         super();
         this.canvas = document.createElement('canvas');
@@ -31,7 +31,8 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
 
       onAdd() {
         const panes = this.getPanes();
-        panes.overlayLayer.appendChild(this.canvas);
+        // Attaching to overlayMouseTarget is crucial for correct positioning and interaction.
+        panes.overlayMouseTarget.appendChild(this.canvas);
       }
 
       onRemove() {
@@ -63,21 +64,14 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
         const ne = bounds.getNorthEast();
         const sw = bounds.getSouthWest();
 
-        // --- THE FUNDAMENTAL FIX: INTEGER-BASED LOOP ---
-        // 1. Calculate the integer indices for the visible area.
         const startIY = Math.floor(sw.lat() / GRID_SIZE);
         const startIX = Math.floor(sw.lng() / GRID_SIZE);
         const endIY = Math.floor(ne.lat() / GRID_SIZE);
         const endIX = Math.floor(ne.lng() / GRID_SIZE);
 
-        // 2. Loop through the integer indices.
         for (let iy = startIY; iy <= endIY; iy++) {
           for (let ix = startIX; ix <= endIX; ix++) {
-            
-            // 3. The key is now generated directly from pure integers.
             const key = `${iy}_${ix}`;
-            
-            // 4. Calculate the geographical coordinates from the integer indices for drawing.
             const south = iy * GRID_SIZE;
             const west = ix * GRID_SIZE;
             
@@ -114,7 +108,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
     }
 
     if (!overlayRef.current) {
-      overlayRef.current = new IntegerBasedOverlay();
+      overlayRef.current = new FinalCorrectedOverlay();
       overlayRef.current.setMap(map);
     }
 
