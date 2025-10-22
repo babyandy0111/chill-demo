@@ -92,15 +92,41 @@ function App() {
   const [selectedCell, setSelectedCell] = useState(null); // New state for the info window
   const mapRef = useRef(null);
 
-  // This function now handles both opening and closing the info window.
-  const handleSelectCell = (key, position) => {
-    // If clicking the currently selected cell, or a claimed cell, or clicking away, close the window.
-    if ((selectedCell && selectedCell.key === key) || claimedCells[key]) {
+  // This function is now async to handle the geocoding API call.
+  const handleSelectCell = async (key, position) => {
+    // Close window if clicking away or on a claimed cell.
+    if (!key || (selectedCell && selectedCell.key === key) || claimedCells[key]) {
       setSelectedCell(null);
       return;
     }
-    // Otherwise, open the window for the new cell.
-    setSelectedCell({ key, position });
+
+    // Immediately show the window in a loading state.
+    setSelectedCell({ key, position, isLoading: true });
+
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      const response = await geocoder.geocode({ location: position });
+
+      if (response.results && response.results[0]) {
+        const address = response.results[0].address_components;
+        const country = address.find(c => c.types.includes('country'));
+        const region = address.find(c => c.types.includes('administrative_area_level_1'));
+
+        const countryName = country ? country.long_name : '未知水域';
+        const countryCode = country ? country.short_name.toLowerCase() : null;
+        const regionName = region ? region.long_name : '';
+        
+        const flagUrl = countryCode ? `https://flagcdn.com/w40/${countryCode}.png` : null;
+
+        // Update the state with the fetched information.
+        setSelectedCell({ key, position, isLoading: false, countryName, regionName, flagUrl });
+      } else {
+        setSelectedCell({ key, position, isLoading: false, countryName: '無法取得地點資訊', regionName: '', flagUrl: null });
+      }
+    } catch (error) {
+      console.error("Geocoding failed:", error);
+      setSelectedCell({ key, position, isLoading: false, countryName: '地理資訊查詢失敗', regionName: '', flagUrl: null });
+    }
   };
 
   // This function is called when the "Occupy" button is clicked
@@ -181,7 +207,7 @@ function App() {
       {/* The CellInfoWindow is now a simple UI component rendered at the App level */}
       {selectedCell && (
         <CellInfoWindow
-          cell={selectedCell}
+          cellInfo={selectedCell}
           onClaim={handleClaimCell}
         />
       )}
