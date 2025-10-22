@@ -1,133 +1,80 @@
-// src/Leaderboard.jsx
-import React from 'react';
+import React, { useState } from 'react';
 
-const leaderboardStyle = {
-    position: 'absolute',
-    top: '80px',
-    left: '20px',
-    width: '250px',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-    zIndex: 20,
-    padding: '15px',
-    fontFamily: 'Arial, sans-serif',
+// Mock Data (can be replaced with API calls)
+const mockData = {
+  country: {
+    day: [{ rank: 1, name: '台灣', score: 1024 }, { rank: 2, name: '日本', score: 980 }],
+    week: [{ rank: 1, name: '日本', score: 8024 }, { rank: 2, name: '美國', score: 7980 }],
+    month: [{ rank: 1, name: '美國', score: 30024 }, { rank: 2, name: '台灣', score: 28980 }],
+    all: [{ rank: 1, name: '美國', score: 150024 }, { rank: 2, name: '日本', score: 128980 }],
+  },
+  city: {
+    day: [{ rank: 1, name: '台北', score: 512 }, { rank: 2, name: '東京', score: 490 }],
+    week: [{ rank: 1, name: '東京', score: 4012 }, { rank: 2, name: '紐約', score: 3990 }],
+    month: [{ rank: 1, name: '紐約', score: 15012 }, { rank: 2, name: '台北', score: 14490 }],
+    all: [{ rank: 1, name: '紐約', score: 75012 }, { rank: 2, name: '東京', score: 64490 }],
+  },
+  personal: {
+    day: [{ rank: 1, name: 'User A', score: 50 }, { rank: 2, name: 'User B', score: 45 }],
+    week: [{ rank: 1, name: 'User C', score: 250 }, { rank: 2, name: 'User A', score: 245 }],
+    month: [{ rank: 1, name: 'User C', score: 1000 }, { rank: 2, name: 'User D', score: 950 }],
+    all: [{ rank: 1, name: 'User C', score: 5000 }, { rank: 2, name: 'User D', score: 4750 }],
+  }
 };
 
-const titleStyle = {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '10px',
-    paddingBottom: '10px',
-    borderBottom: '1px solid #eee',
-    textAlign: 'center',
-};
+const TabButton = ({ children, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`px-3 py-1 text-sm rounded-full transition-colors ${
+      active ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+    }`}
+  >
+    {children}
+  </button>
+);
 
-const listStyle = {
-    listStyle: 'none',
-    padding: 0,
-    margin: 0,
-};
+function Leaderboard() {
+  const [scope, setScope] = useState('country'); // country, city, personal
+  const [time, setTime] = useState('day'); // day, week, month, all
 
-const listItemStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '8px 0',
-    fontSize: '14px',
-};
+  const data = mockData[scope][time];
+  const title = `${scope.charAt(0).toUpperCase() + scope.slice(1)} Leaderboard`;
 
-const rankStyle = {
-    fontWeight: 'bold',
-    marginRight: '10px',
-    color: '#333',
-};
+  return (
+    <div className="w-64 bg-white bg-opacity-90 rounded-xl shadow-lg p-4 text-gray-800">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-bold">{title}</h3>
+        {/* Account Icon Placeholder */}
+        <div className="w-8 h-8 rounded-full bg-gray-300"></div>
+      </div>
 
-const nameStyle = {
-    flexGrow: 1,
-    color: '#555',
-};
+      {/* Scope Tabs */}
+      <div className="flex space-x-2 mb-3">
+        <TabButton active={scope === 'country'} onClick={() => setScope('country')}>Country</TabButton>
+        <TabButton active={scope === 'city'} onClick={() => setScope('city')}>City</TabButton>
+        <TabButton active={scope === 'personal'} onClick={() => setScope('personal')}>Personal</TabButton>
+      </div>
 
-const scoreStyle = {
-    fontWeight: 'bold',
-    color: '#46bcec',
-};
+      {/* Time Tabs */}
+      <div className="flex space-x-2 mb-4">
+        <TabButton active={time === 'day'} onClick={() => setTime('day')}>Day</TabButton>
+        <TabButton active={time === 'week'} onClick={() => setTime('week')}>Week</TabButton>
+        <TabButton active={time === 'month'} onClick={() => setTime('month')}>Month</TabButton>
+        <TabButton active={time === 'all'} onClick={() => setTime('all')}>All</TabButton>
+      </div>
 
-// 假資料
-const worldData = [
-    { rank: 1, name: '東京', score: 1024 },
-    { rank: 2, name: '紐約', score: 980 },
-    { rank: 3, name: '倫敦', score: 850 },
-    { rank: 4, name: '巴黎', score: 760 },
-    { rank: 5, name: '台北', score: 680 },
-];
-
-const countryData = {
-    '台灣': [
-        { rank: 1, name: '台北', score: 680 },
-        { rank: 2, name: '高雄', score: 540 },
-        { rank: 3, name: '台中', score: 480 },
-        { rank: 4, name: '台南', score: 420 },
-        { rank: 5, name: '新竹', score: 350 },
-    ],
-    '日本': [
-        { rank: 1, name: '東京', score: 1024 },
-        { rank: 2, name: '大阪', score: 880 },
-        { rank: 3, name: '京都', score: 720 },
-        { rank: 4, name: '福岡', score: 610 },
-        { rank: 5, name: '札幌', score: 550 },
-    ]
-};
-
-const localData = {
-    '台北': {
-        total: 680,
-        today: 52,
-    }
-};
-
-
-function Leaderboard({ zoom, currentCity = '台北', currentCountry = '台灣' }) {
-    let title = '';
-    let data = [];
-
-    if (zoom <= 5) {
-        title = '全球 Chill 指數 Top 5';
-        data = worldData;
-    } else if (zoom <= 10) {
-        title = `${currentCountry} Chill 指數 Top 5`;
-        data = countryData[currentCountry] || [];
-    } else {
-        const cityData = localData[currentCity];
-        return (
-            <div style={leaderboardStyle}>
-                <h3 style={titleStyle}>{currentCity} Chill 指數</h3>
-                <div style={{textAlign: 'center', padding: '10px'}}>
-                    <div style={{fontSize: '28px', fontWeight: 'bold', color: '#46bcec'}}>{cityData?.total || 0}</div>
-                    <div style={{fontSize: '14px', color: '#777'}}>總累積</div>
-                </div>
-                 <div style={{textAlign: 'center', padding: '10px', marginTop: '10px'}}>
-                    <div style={{fontSize: '22px', fontWeight: 'bold', color: '#555'}}>{cityData?.today || 0}</div>
-                    <div style={{fontSize: '12px', color: '#999'}}>今日貢獻</div>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div style={leaderboardStyle}>
-            <h3 style={titleStyle}>{title}</h3>
-            <ul style={listStyle}>
-                {data.map(item => (
-                    <li key={item.rank} style={listItemStyle}>
-                        <span style={rankStyle}>{item.rank}</span>
-                        <span style={nameStyle}>{item.name}</span>
-                        <span style={scoreStyle}>{item.score}</span>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
+      {/* Leaderboard List */}
+      <ul className="space-y-2">
+        {data.map(item => (
+          <li key={item.rank} className="flex items-center text-sm">
+            <span className="font-bold w-6">{item.rank}</span>
+            <span className="flex-grow truncate">{item.name}</span>
+            <span className="font-semibold text-blue-500">{item.score}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export default Leaderboard;
