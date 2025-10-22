@@ -1,121 +1,100 @@
-import React, {useState, useCallback, useImperativeHandle, forwardRef, useRef} from "react";
-import {GoogleMap, LoadScript, Marker} from "@react-google-maps/api";
+import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef } from "react";
+import { GoogleMap, LoadScript, Marker } from "@react-google-maps/api";
 import Particles from "react-particles";
-import {particlesOptions} from "./cloud-particles-config.jsx";
+import { particlesOptions } from "./cloud-particles-config.jsx";
 import cloudImage from "./assets/cloud.png";
 
-const mapContainerStyle = {
-    width: "100%",
-    height: "100%",
-};
-
-const center = {
-    lat: 25.0330,
-    lng: 121.5654,
-};
-
+const mapContainerStyle = { width: "100%", height: "100%" };
+const center = { lat: 25.0330, lng: 121.5654 };
 const particlesStyle = {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    zIndex: 1,
-    pointerEvents: "none",
+  position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+  zIndex: 1, pointerEvents: "none",
 };
-
 const mapRootStyle = {
-    position: 'absolute',
-    inset: '0px',
-    width: '100%',
-    height: '100%',
+  position: 'absolute', inset: '0px', width: '100%', height: '100%',
 };
 
-const MapWithClouds = forwardRef(({onMapClick, setMapRef, onZoomChanged}, ref) => {
-    const [cloudMarkers, setCloudMarkers] = useState([]);
-    const mapInstanceRef = useRef(null);
-    const particlesContainerRef = useRef(null);
+const MapWithClouds = forwardRef(({ onMapClick, setMapRef, onZoomChanged }, ref) => {
+  const [cloudMarkers, setCloudMarkers] = useState([]);
+  const mapInstanceRef = useRef(null);
+  const particlesContainerRef = useRef(null);
 
-    const onParticlesLoaded = useCallback(container => {
-        particlesContainerRef.current = container;
-    }, []);
+  const onParticlesLoaded = useCallback(container => {
+    particlesContainerRef.current = container;
+  }, []);
 
-    useImperativeHandle(ref, () => ({
-        triggerParticles(lat, lng) {
-            if (particlesContainerRef.current && mapInstanceRef.current) {
-                const projection = mapInstanceRef.current.getProjection();
-                const domPoint = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(lat, lng));
-
-                if (domPoint) {
-                    particlesContainerRef.current.addEmitter({
-                        position: {
-                            x: domPoint.x,
-                            y: domPoint.y,
-                        },
-                    });
-                }
-            }
+  useImperativeHandle(ref, () => ({
+    triggerParticles(lat, lng) {
+      if (particlesContainerRef.current && mapInstanceRef.current) {
+        const projection = mapInstanceRef.current.getProjection();
+        const domPoint = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(lat, lng));
+        if (domPoint) {
+          particlesContainerRef.current.addEmitter({
+            position: { x: domPoint.x, y: domPoint.y },
+          });
         }
-    }));
+      }
+    }
+  }));
 
-    const handleMapLoad = useCallback((map) => {
-        mapInstanceRef.current = map;
-        setMapRef(map);
-    }, [setMapRef]);
+  const handleMapLoad = useCallback((map) => {
+    mapInstanceRef.current = map;
+    setMapRef(map);
+  }, [setMapRef]);
 
-    const handleMapClick = useCallback((event) => {
-        const newCloud = {
-            lat: event.latLng.lat(),
-            lng: event.latLng.lng(),
-        };
-        setCloudMarkers((currentMarkers) => [...currentMarkers, newCloud]);
-        onMapClick(newCloud);
-    }, [onMapClick]);
-
-    const handleIdle = () => {
-        if (mapInstanceRef.current && onZoomChanged) {
-            const newZoom = mapInstanceRef.current.getZoom();
-            onZoomChanged(newZoom);
-        }
+  const handleMapClick = useCallback((event) => {
+    const newCloud = {
+      lat: event.latLng.lat(),
+      lng: event.latLng.lng(),
     };
+    setCloudMarkers((currentMarkers) => [...currentMarkers, newCloud]);
+    onMapClick(newCloud);
+  }, [onMapClick]);
 
-    return (
-        <div style={mapRootStyle}>
-            <Particles
-                id="tsparticles"
-                options={particlesOptions}
-                onLoaded={onParticlesLoaded}
-                style={particlesStyle}
+  const handleIdle = () => {
+    if (mapInstanceRef.current && onZoomChanged) {
+      onZoomChanged(mapInstanceRef.current.getZoom());
+    }
+  };
+
+  return (
+    <div style={mapRootStyle}>
+      <Particles
+        id="tsparticles"
+        options={particlesOptions}
+        onLoaded={onParticlesLoaded}
+        style={particlesStyle}
+      />
+      <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+        <GoogleMap
+          mapContainerStyle={mapContainerStyle}
+          center={center}
+          zoom={10}
+          options={{
+            disableDefaultUI: true,
+            gestureHandling: 'greedy',
+            zoomControl: false,
+            tilt: 45,
+          }}
+          onLoad={handleMapLoad}
+          onClick={handleMapClick}
+          onIdle={handleIdle}
+        >
+          {cloudMarkers.map((cloud, index) => (
+            <Marker
+              key={index}
+              position={{ lat: cloud.lat, lng: cloud.lng }}
+              icon={{
+                url: cloudImage,
+                scaledSize: new window.google.maps.Size(50, 50),
+              }}
+              animation={window.google.maps.Animation.DROP}
             />
-            <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-                <GoogleMap
-                          mapContainerStyle={mapContainerStyle}
-                          center={center}
-                          zoom={10}
-                          options={{
-                            disableDefaultUI: true,
-                            gestureHandling: 'greedy', // Allow direct scroll wheel zoom
-                            zoomControl: false,
-                            tilt: 45,
-                          }}
-                          onLoad={handleMapLoad}
-                          onClick={handleMapClick}
-                          onIdle={handleIdle}
-                        >                    {cloudMarkers.map((cloud, index) => (
-                        <Marker
-                            key={index}
-                            position={{lat: cloud.lat, lng: cloud.lng}}
-                            icon={{
-                                url: cloudImage,
-                                scaledSize: new window.google.maps.Size(50, 50),
-                            }}
-                            animation={window.google.maps.Animation.DROP}
-                        />
-                    ))}
-                </GoogleMap>
-            </LoadScript>
-        </div>
-    );
+          ))}
+        </GoogleMap>
+      </LoadScript>
+    </div>
+  );
 });
 
 export default MapWithClouds;
