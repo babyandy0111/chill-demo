@@ -2,7 +2,6 @@ import React, {useState, useCallback, useImperativeHandle, forwardRef, useRef} f
 import {GoogleMap, LoadScript, Marker} from "@react-google-maps/api";
 import Particles from "react-particles";
 import {particlesOptions} from "./cloud-particles-config.jsx";
-import {mapStyles} from "./map-styles.js";
 import cloudImage from "./assets/cloud.png";
 
 const mapContainerStyle = {
@@ -90,21 +89,19 @@ const MapWithClouds = forwardRef(({onMapClick, setMapRef, onZoomChanged}, ref) =
             />
             <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
                 <GoogleMap
-                    mapContainerStyle={mapContainerStyle}
-                    center={center}
-                    zoom={10}
-                    options={{
-                        styles: mapStyles,
-                        disableDefaultUI: true,
-                        gestureHandling: 'cooperative',
-                        zoomControl: false,
-                        tilt: 45,
-                    }}
-                    onLoad={handleMapLoad}
-                    onClick={handleMapClick}
-                    onIdle={handleIdle}
-                >
-                    {cloudMarkers.map((cloud, index) => (
+                          mapContainerStyle={mapContainerStyle}
+                          center={center}
+                          zoom={10}
+                          options={{
+                            disableDefaultUI: true,
+                            gestureHandling: 'greedy', // Allow direct scroll wheel zoom
+                            zoomControl: false,
+                            tilt: 45,
+                          }}
+                          onLoad={handleMapLoad}
+                          onClick={handleMapClick}
+                          onIdle={handleIdle}
+                        >                    {cloudMarkers.map((cloud, index) => (
                         <Marker
                             key={index}
                             position={{lat: cloud.lat, lng: cloud.lng}}

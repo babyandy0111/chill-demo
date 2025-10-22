@@ -61,24 +61,27 @@ const bottomRightContainerStyle = {
 
 
 // --- Helper Function ---
-const smoothAnimate = (map, target, duration) => {
+const smoothAnimate = (map, targetCenter, duration, targetZoom = null) => {
   return new Promise((resolve) => {
-    const start = {
-      lat: map.getCenter().lat(),
-      lng: map.getCenter().lng(),
-      zoom: map.getZoom(),
-    };
+    const startCenter = map.getCenter();
+    const startZoom = map.getZoom();
     const startTime = Date.now();
+
     const animate = () => {
       const now = Date.now();
       const progress = Math.min((now - startTime) / duration, 1);
       const easeProgress = progress * progress * (3 - 2 * progress);
-      const current = {
-        lat: start.lat + (target.lat - start.lat) * easeProgress,
-        lng: start.lng + (target.lng - start.lng) * easeProgress,
-        zoom: start.zoom + (target.zoom - start.zoom) * easeProgress,
+
+      const currentCenter = {
+        lat: startCenter.lat() + (targetCenter.lat - startCenter.lat()) * easeProgress,
+        lng: startCenter.lng() + (targetCenter.lng - startCenter.lng()) * easeProgress,
       };
-      map.moveCamera({ center: { lat: current.lat, lng: current.lng }, zoom: current.zoom });
+      
+      // Only change zoom if a targetZoom is provided
+      const currentZoom = targetZoom !== null ? startZoom + (targetZoom - startZoom) * easeProgress : startZoom;
+
+      map.moveCamera({ center: currentCenter, zoom: currentZoom });
+
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
@@ -102,7 +105,7 @@ function App() {
       setClouds(clouds - 1);
       if (particlesRef.current) {
         particlesRef.current.triggerParticles(newCloud.lat, newCloud.lng);
-      }
+      } 
     } else {
       setIsModalOpen(true);
     }
@@ -122,8 +125,15 @@ function App() {
               lat: position.coords.latitude,
               lng: position.coords.longitude,
             };
-            await smoothAnimate(mapRef.current, { ...userLocation, zoom: 18 }, 2500);
-            await smoothAnimate(mapRef.current, { ...userLocation, zoom: 15 }, 1500);
+            const currentZoom = mapRef.current.getZoom();
+
+            // 1. Pan to location first, without changing zoom
+            await smoothAnimate(mapRef.current, userLocation, 1500);
+
+            // 2. If the view is zoomed out, swoop directly to the final zoom level 15
+            if (currentZoom < 15) {
+              await smoothAnimate(mapRef.current, userLocation, 2000, 15);
+            }
           }
         },
         () => alert("無法取得您的位置資訊。"),
@@ -133,7 +143,6 @@ function App() {
       alert("您的瀏覽器不支援地理位置功能。");
     }
   };
-
   const handleZoomChanged = (newZoom) => {
     setZoom(newZoom);
   };
