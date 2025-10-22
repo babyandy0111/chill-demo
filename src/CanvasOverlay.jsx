@@ -12,16 +12,22 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
   useEffect(() => {
     if (!map) return;
 
-    class FinalCorrectedOverlay extends window.google.maps.OverlayView {
+    class FinalCanvasOverlay extends window.google.maps.OverlayView {
       constructor() {
         super();
         this.canvas = document.createElement('canvas');
         this.ctx = this.canvas.getContext('2d');
         this.props = {};
         this.canvas.style.position = 'absolute';
-        this.canvas.style.left = '0px';
-        this.canvas.style.top = '0px';
         this.canvas.style.pointerEvents = 'none';
+
+        // --- BUILT-IN VISUAL DEBUGGING ---
+        // The canvas will have a semi-transparent green background.
+        // If you see a green layer, the canvas is being rendered.
+        // If the green layer is misaligned, we know the positioning is wrong.
+        this.canvas.style.backgroundColor = 'rgba(0, 255, 0, 0.1)';
+        // --- END DEBUGGING ---
+
         cloudImage.onload = () => this.draw();
       }
 
@@ -31,7 +37,8 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
 
       onAdd() {
         const panes = this.getPanes();
-        // Attaching to overlayMouseTarget is crucial for correct positioning and interaction.
+        // We use overlayMouseTarget because it is designed for this kind of overlay
+        // and sits correctly in the layer stack.
         panes.overlayMouseTarget.appendChild(this.canvas);
       }
 
@@ -43,26 +50,28 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
 
       draw() {
         const projection = this.getProjection();
-        if (!projection || !this.canvas) return;
+        if (!projection) return;
 
         const { zoom, claimedCells, hoveredCell } = this.props;
 
-        const mapDiv = map.getDiv();
-        const mapWidth = mapDiv.clientWidth;
-        const mapHeight = mapDiv.clientHeight;
+        // This is the robust method for sizing and positioning the overlay.
+        const bounds = map.getBounds();
+        const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
+        const swPixel = projection.fromLatLngToDivPixel(sw);
+        const nePixel = projection.fromLatLngToDivPixel(ne);
 
-        if (this.canvas.width !== mapWidth) this.canvas.width = mapWidth;
-        if (this.canvas.height !== mapHeight) this.canvas.height = mapHeight;
+        if (!swPixel || !nePixel) return;
+
+        // Position and size the canvas to perfectly match the map's viewport.
+        this.canvas.style.left = `${swPixel.x}px`;
+        this.canvas.style.top = `${nePixel.y}px`;
+        this.canvas.width = nePixel.x - swPixel.x;
+        this.canvas.height = swPixel.y - nePixel.y;
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (zoom < 17) return;
-
-        const bounds = map.getBounds();
-        if (!bounds) return;
-
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
 
         const startIY = Math.floor(sw.lat() / GRID_SIZE);
         const startIX = Math.floor(sw.lng() / GRID_SIZE);
@@ -78,22 +87,22 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
             const cellSW = new window.google.maps.LatLng(south, west);
             const cellNE = new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE);
             
-            const swPixel = projection.fromLatLngToDivPixel(cellSW);
-            const nePixel = projection.fromLatLngToDivPixel(cellNE);
+            const pixelSW = projection.fromLatLngToDivPixel(cellSW);
+            const pixelNE = projection.fromLatLngToDivPixel(cellNE);
 
-            if (!swPixel || !nePixel) continue;
+            if (!pixelSW || !pixelNE) continue;
 
-            const rectX = swPixel.x;
-            const rectY = nePixel.y;
-            const rectWidth = nePixel.x - swPixel.x;
-            const rectHeight = swPixel.y - nePixel.y;
+            // Translate from world coordinates (DivPixel) to canvas-local coordinates.
+            const rectX = pixelSW.x - swPixel.x;
+            const rectY = pixelNE.y - nePixel.y;
+            const rectWidth = pixelNE.x - pixelSW.x;
+            const rectHeight = pixelSW.y - pixelNE.y;
 
             if (claimedCells && claimedCells[key]) {
               if (cloudImage.complete) {
                 this.ctx.drawImage(cloudImage, rectX, rectY, rectWidth, rectHeight);
               }
-            } 
-            else {
+            } else {
               if (key === hoveredCell) {
                 this.ctx.fillStyle = 'rgba(59, 130, 246, 0.4)';
                 this.ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
@@ -108,7 +117,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
     }
 
     if (!overlayRef.current) {
-      overlayRef.current = new FinalCorrectedOverlay();
+      overlayRef.current = new FinalCanvasOverlay();
       overlayRef.current.setMap(map);
     }
 
