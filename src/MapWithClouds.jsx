@@ -1,6 +1,8 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import { GoogleMap, LoadScript } from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
+import CellInfoWindow from "./CellInfoWindow.jsx";
+import CurrentUserLocationMarker from "./CurrentUserLocationMarker.jsx";
 
 const GRID_SIZE = 0.0005;
 
@@ -17,7 +19,7 @@ const mapStyles = [
   { featureType: "landscape.natural", elementType: "labels", stylers: [{ visibility: "off" }] },
 ];
 
-const MapWithClouds = ({ onSelectCell, claimedCells, setMapRef, onZoomChanged }) => {
+const MapWithClouds = ({ onSelectCell, claimedCells, setMapRef, onZoomChanged, selectedCell, onClaim, userLocation }) => {
   const [hoveredCell, setHoveredCell] = useState(null);
   const [zoom, setZoom] = useState(18);
   const [mapInstance, setMapInstance] = useState(null);
@@ -94,6 +96,18 @@ const MapWithClouds = ({ onSelectCell, claimedCells, setMapRef, onZoomChanged })
             claimedCells={claimedCells}
             hoveredCell={hoveredCell}
           />
+
+          {/* Both the InfoWindow and the LocationMarker are now correctly rendered here */}
+          {selectedCell && (
+            <CellInfoWindow
+              cellInfo={selectedCell}
+              onClaim={onClaim}
+            />
+          )}
+
+          {userLocation && (
+            <CurrentUserLocationMarker position={userLocation} />
+          )}
         </GoogleMap>
       </LoadScript>
     </div>

@@ -90,7 +90,8 @@ function App() {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [zoom, setZoom] = useState(10);
   const [claimedCells, setClaimedCells] = useState({});
-  const [selectedCell, setSelectedCell] = useState(null); // New state for the info window
+  const [selectedCell, setSelectedCell] = useState(null);
+  const [userLocation, setUserLocation] = useState(null); // State for the user's location marker
   const mapRef = useRef(null);
 
   // This function is now async to handle the geocoding API call.
@@ -159,15 +160,19 @@ function App() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+
+          // Set the user location to show the marker
+          setUserLocation(location);
+
           if (mapRef.current) {
-            const userLocation = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
             const currentZoom = mapRef.current.getZoom();
-            await smoothAnimate(mapRef.current, userLocation, 1500);
+            await smoothAnimate(mapRef.current, location, 1500);
             if (currentZoom < 15) {
-              await smoothAnimate(mapRef.current, userLocation, 2000, 15);
+              await smoothAnimate(mapRef.current, location, 2000, 15);
             }
           }
         },
@@ -206,6 +211,9 @@ function App() {
         claimedCells={claimedCells}
         setMapRef={(map) => { mapRef.current = map; }}
         onZoomChanged={handleZoomChanged}
+        selectedCell={selectedCell}
+        onClaim={handleClaimCell}
+        userLocation={userLocation} // Pass the user location state down
       />
 
       {/* The CellInfoWindow is now a simple UI component rendered at the App level */}
