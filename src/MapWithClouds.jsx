@@ -1,5 +1,5 @@
 // MapWithClouds.jsx
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { GoogleMap, LoadScript, Marker } from "@react-google-maps/api";
 import Particles from "react-particles";
 import { loadFull } from "tsparticles";
@@ -7,7 +7,9 @@ import { particlesOptions } from "./cloud-particles-config.jsx";
 import { mapStyles } from "./map-styles.js";
 import cloudImage from "./assets/cloud.png";
 import CloudCounter from "./CloudCounter.jsx";
-import RegistrationModal from "./RegistrationModal.jsx"; // 引入註冊彈窗
+import RegistrationModal from "./RegistrationModal.jsx";
+import Compass from "./Compass.jsx";
+import Leaderboard from "./Leaderboard.jsx"; // 引入排行榜元件
 
 // --- 地圖設定 ---
 const mapContainerStyle = {
@@ -34,9 +36,14 @@ const particlesStyle = {
 function MapWithClouds() {
     const [clouds, setClouds] = useState([]);
     const [cloudCount, setCloudCount] = useState(10);
-    const [isModalOpen, setIsModalOpen] = useState(false); // 控制彈窗顯示的狀態
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [zoom, setZoom] = useState(10); // 追蹤縮放層級的狀態
+    const mapRef = useRef(null);
 
-    // 地圖點擊事件
+    const onMapLoad = useCallback((map) => {
+        mapRef.current = map;
+    }, []);
+
     const onMapClick = useCallback((event) => {
         if (cloudCount > 0) {
             const newCloud = {
@@ -49,19 +56,29 @@ function MapWithClouds() {
         }
     }, [cloudCount]);
 
-    // 監聽 cloudCount 的變化，當它變為 0 時打開彈窗
+    // 監聽縮放層級變化
+    const handleZoomChanged = () => {
+        if (mapRef.current) {
+            setZoom(mapRef.current.getZoom());
+        }
+    };
+
     useEffect(() => {
         if (cloudCount === 0) {
             setIsModalOpen(true);
         }
     }, [cloudCount]);
 
-    // 處理註冊邏輯
     const handleRegister = () => {
-        // 在這裡可以加入實際的註冊 API 呼叫
         console.log("註冊成功！");
-        setCloudCount(10); // 獎勵 10 朵雲
-        setIsModalOpen(false); // 關閉彈窗
+        setCloudCount(10);
+        setIsModalOpen(false);
+    };
+
+    const handleCompassClick = () => {
+        if (mapRef.current) {
+            mapRef.current.panTo(center);
+        }
     };
 
     const particlesInit = useCallback(async (engine) => {
@@ -70,6 +87,7 @@ function MapWithClouds() {
 
     return (
         <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
+            <Leaderboard zoom={zoom} /> {/* 渲染排行榜 */}
             <CloudCounter count={cloudCount} />
             <Particles
                 id="tsparticles"
@@ -86,7 +104,9 @@ function MapWithClouds() {
                         styles: mapStyles,
                         disableDefaultUI: true,
                     }}
+                    onLoad={onMapLoad}
                     onClick={onMapClick}
+                    onZoomChanged={handleZoomChanged} // 綁定縮放事件
                 >
                     {clouds.map((cloud, index) => (
                         <Marker
@@ -96,13 +116,16 @@ function MapWithClouds() {
                                 url: cloudImage,
                                 scaledSize: new window.google.maps.Size(50, 50),
                             }}
+                            animation={window.google.maps.Animation.DROP} // 加上掉落動畫
                         />
                     ))}
                 </GoogleMap>
             </LoadScript>
 
-            {/* 條件渲染註冊彈窗 */}
+            <Compass onClick={handleCompassClick} />
             {isModalOpen && <RegistrationModal onRegister={handleRegister} />}
         </div>
     );
 }
+
+export default MapWithClouds;
