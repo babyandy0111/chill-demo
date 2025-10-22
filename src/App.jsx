@@ -4,7 +4,7 @@ import CloudCounter from './CloudCounter.jsx';
 import Leaderboard from './Leaderboard.jsx';
 import Compass from './Compass.jsx';
 import RegistrationModal from './RegistrationModal.jsx';
-import InfoModal from './InfoModal.jsx'; // Import the new modal
+import InfoModal from './InfoModal.jsx';
 
 const styles = {
   app: {
@@ -85,16 +85,24 @@ function App() {
   const [clouds, setClouds] = useState(10);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
-  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false); // New state for info modal
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [zoom, setZoom] = useState(10);
+  const [claimedCells, setClaimedCells] = useState({});
   const mapRef = useRef(null);
   const particlesRef = useRef(null);
 
-  const handleMapClick = (newCloud) => {
+  const handleClaimCell = (cellBounds) => {
     if (clouds > 0) {
       setClouds(clouds - 1);
+      const cellKey = `${cellBounds.south}_${cellBounds.west}`;
+      setClaimedCells(prev => ({
+        ...prev,
+        [cellKey]: { owner: 'user', color: '#3B82F6' }
+      }));
+      const centerLat = (cellBounds.north + cellBounds.south) / 2;
+      const centerLng = (cellBounds.east + cellBounds.west) / 2;
       if (particlesRef.current) {
-        particlesRef.current.triggerParticles(newCloud.lat, newCloud.lng);
+        particlesRef.current.triggerParticles(centerLat, centerLng);
       }
     } else {
       setIsModalOpen(true);
@@ -147,14 +155,15 @@ function App() {
   };
 
   const handleInfoClick = () => {
-    setIsInfoModalOpen(true); // Open the info modal
+    setIsInfoModalOpen(true);
   };
 
   return (
     <div style={styles.app}>
       <MapWithClouds 
         ref={particlesRef}
-        onMapClick={handleMapClick} 
+        onClaimCell={handleClaimCell}
+        claimedCells={claimedCells}
         setMapRef={(map) => { mapRef.current = map; }}
         onZoomChanged={handleZoomChanged}
       />
