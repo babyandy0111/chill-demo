@@ -66,7 +66,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        if (zoom < 17) return;
+        if (zoom < 15) return;
 
         const startIY = Math.floor(sw.lat() / GRID_SIZE);
         const startIX = Math.floor(sw.lng() / GRID_SIZE);

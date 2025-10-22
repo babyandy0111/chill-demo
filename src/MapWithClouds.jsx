@@ -39,7 +39,7 @@ const MapWithClouds = ({ onClaimCell, claimedCells, setMapRef, onZoomChanged }) 
   };
 
   const handleMouseMove = (e) => {
-    if (zoom < 17) {
+    if (zoom < 15) {
       if (hoveredCell) setHoveredCell(null);
       return;
     }
@@ -52,7 +52,7 @@ const MapWithClouds = ({ onClaimCell, claimedCells, setMapRef, onZoomChanged }) 
   };
 
   const handleClick = (e) => {
-    if (zoom < 17) return;
+    if (zoom < 15) return;
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
 
