@@ -1,9 +1,25 @@
 import React from 'react';
 
+const counterStyle = {
+  backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  color: 'white',
+  padding: '8px 20px',
+  borderRadius: '9999px',
+  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  fontSize: '18px',
+};
+
+const iconStyle = {
+  fontSize: '24px',
+};
+
 function CloudCounter({ count }) {
   return (
-    <div className="bg-black bg-opacity-70 text-white py-2 px-5 rounded-full shadow-lg flex items-center gap-3 text-lg">
-      <span className="text-2xl">☁️</span>
+    <div style={counterStyle}>
+      <span style={iconStyle}>☁️</span>
       <span>{count}</span>
     </div>
   );

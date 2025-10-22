@@ -1,13 +1,40 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+const baseStyle = {
+  width: '48px',
+  height: '48px',
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  borderRadius: '50%',
+  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  cursor: 'pointer',
+  border: 'none',
+  transition: 'transform 0.2s ease-in-out',
+};
+
+const iconStyle = {
+  fontSize: '28px',
+};
 
 function Compass({ onClick }) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const compassStyle = {
+    ...baseStyle,
+    transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+  };
+
   return (
     <button
       onClick={onClick}
       title="Reset View"
-      className="w-12 h-12 bg-white bg-opacity-90 rounded-full shadow-lg flex justify-center items-center cursor-pointer transition-transform duration-200 ease-in-out hover:scale-110"
+      style={compassStyle}
+      onMouseOver={() => setIsHovered(true)}
+      onMouseOut={() => setIsHovered(false)}
     >
-      <span className="text-3xl">🧭</span>
+      <span style={iconStyle}>🧭</span>
     </button>
   );
 }

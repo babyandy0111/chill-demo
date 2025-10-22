@@ -5,7 +5,62 @@ import Leaderboard from './Leaderboard.jsx';
 import Compass from './Compass.jsx';
 import RegistrationModal from './RegistrationModal.jsx';
 
-// --- 輔助函式：實現平滑動畫 ---
+// --- Style Objects ---
+const appStyle = {
+  position: 'relative',
+  width: '100vw',
+  height: '100vh',
+};
+
+const topLeftControlsStyle = {
+  position: 'absolute',
+  top: '16px',
+  left: '16px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  zIndex: 50,
+};
+
+const controlButtonStyle = {
+  width: '40px',
+  height: '40px',
+  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  borderRadius: '50%',
+  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '20px',
+  fontWeight: 'bold',
+  border: 'none',
+  cursor: 'pointer',
+};
+
+const topCenterContainerStyle = {
+  position: 'absolute',
+  top: '16px',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 50,
+};
+
+const topRightContainerStyle = {
+  position: 'absolute',
+  top: '16px',
+  right: '16px',
+  zIndex: 50,
+};
+
+const bottomRightContainerStyle = {
+  position: 'absolute',
+  bottom: '16px',
+  right: '16px',
+  zIndex: 50,
+};
+
+
+// --- Helper Function ---
 const smoothAnimate = (map, target, duration) => {
   return new Promise((resolve) => {
     const start = {
@@ -13,22 +68,17 @@ const smoothAnimate = (map, target, duration) => {
       lng: map.getCenter().lng(),
       zoom: map.getZoom(),
     };
-
     const startTime = Date.now();
-
     const animate = () => {
       const now = Date.now();
       const progress = Math.min((now - startTime) / duration, 1);
-      const easeProgress = progress * progress * (3 - 2 * progress); // ease-in-out
-
+      const easeProgress = progress * progress * (3 - 2 * progress);
       const current = {
         lat: start.lat + (target.lat - start.lat) * easeProgress,
         lng: start.lng + (target.lng - start.lng) * easeProgress,
         zoom: start.zoom + (target.zoom - start.zoom) * easeProgress,
       };
-
       map.moveCamera({ center: { lat: current.lat, lng: current.lng }, zoom: current.zoom });
-
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
@@ -39,18 +89,17 @@ const smoothAnimate = (map, target, duration) => {
   });
 };
 
-
 function App() {
   const [clouds, setClouds] = useState(10);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false); // New state for leaderboard
   const [zoom, setZoom] = useState(10);
   const mapRef = useRef(null);
-  const particlesRef = useRef(null); // Ref for particle controls
+  const particlesRef = useRef(null);
 
   const handleMapClick = (newCloud) => {
     if (clouds > 0) {
       setClouds(clouds - 1);
-      // Trigger particle effect via the ref
       if (particlesRef.current) {
         particlesRef.current.triggerParticles(newCloud.lat, newCloud.lng);
       }
@@ -60,7 +109,7 @@ function App() {
   };
 
   const handleRegister = () => {
-    setClouds(10); // Reward after registration
+    setClouds(10);
     setIsModalOpen(false);
   };
 
@@ -73,7 +122,6 @@ function App() {
               lat: position.coords.latitude,
               lng: position.coords.longitude,
             };
-            // 俯衝再拉遠的動畫
             await smoothAnimate(mapRef.current, { ...userLocation, zoom: 18 }, 2500);
             await smoothAnimate(mapRef.current, { ...userLocation, zoom: 15 }, 1500);
           }
@@ -90,9 +138,27 @@ function App() {
     setZoom(newZoom);
   };
 
+  // --- New handlers for top-left buttons ---
+  const handleZoomIn = () => {
+    if (mapRef.current) {
+      const currentZoom = mapRef.current.getZoom();
+      mapRef.current.setZoom(currentZoom + 1);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (mapRef.current) {
+      const currentZoom = mapRef.current.getZoom();
+      mapRef.current.setZoom(currentZoom - 1);
+    }
+  };
+
+  const handleInfoClick = () => {
+    alert('Chill Map: Click on the map to leave a cloud. Find your location with the compass.');
+  };
+
   return (
-    <div className="relative w-screen h-screen">
-      {/* Map Component */}
+    <div style={appStyle}>
       <MapWithClouds 
         ref={particlesRef}
         onMapClick={handleMapClick} 
@@ -100,31 +166,35 @@ function App() {
         onZoomChanged={handleZoomChanged}
       />
 
-      {/* Top-Left Controls */}
-      <div className="absolute top-4 left-4 flex flex-col space-y-2 z-10">
-        <button className="w-10 h-10 bg-white bg-opacity-80 rounded-full shadow-md flex items-center justify-center text-xl font-bold">+</button>
-        <button className="w-10 h-10 bg-white bg-opacity-80 rounded-full shadow-md flex items-center justify-center text-xl font-bold">-</button>
-        <button className="w-10 h-10 bg-white bg-opacity-80 rounded-full shadow-md flex items-center justify-center text-xl font-bold">i</button>
+      <div style={topLeftControlsStyle}>
+        <button style={controlButtonStyle} onClick={handleZoomIn}>+</button>
+        <button style={controlButtonStyle} onClick={handleZoomOut}>-</button>
+        <button style={controlButtonStyle} onClick={handleInfoClick}>i</button>
       </div>
 
-      {/* Top-Center Cloud Counter */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+      <div style={topCenterContainerStyle}>
         <CloudCounter count={clouds} />
       </div>
 
-      {/* Top-Right Leaderboard & Account */}
-      <div className="absolute top-4 right-4 z-10">
-        <Leaderboard zoom={zoom} />
+      <div style={topRightContainerStyle}>
+        {/* This button now opens the leaderboard modal */}
+        <button style={controlButtonStyle} onClick={() => setIsLeaderboardOpen(true)}>🏆</button>
       </div>
 
-      {/* Bottom-Right Compass */}
-      <div className="absolute bottom-4 right-4 z-10">
+      <div style={bottomRightContainerStyle}>
         <Compass onClick={handleCompassClick} />
       </div>
 
-      {/* Registration Modal */}
       {isModalOpen && (
         <RegistrationModal onClose={() => setIsModalOpen(false)} onRegister={handleRegister} />
+      )}
+
+      {/* Conditionally render Leaderboard as a modal */}
+      {isLeaderboardOpen && (
+        <Leaderboard 
+          zoom={zoom} 
+          onClose={() => setIsLeaderboardOpen(false)} 
+        />
       )}
     </div>
   );
