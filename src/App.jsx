@@ -6,6 +6,7 @@ import Compass from './Compass.jsx';
 import RegistrationModal from './RegistrationModal.jsx';
 import InfoModal from './InfoModal.jsx';
 import CellInfoWindow from './CellInfoWindow.jsx'; // Import the new component
+import { playClickSound } from './audioPlayer.js';
 
 const styles = {
   app: {
@@ -99,6 +100,9 @@ function App() {
       setSelectedCell(null);
       return;
     }
+
+    // Play sound on new cell selection
+    playClickSound();
 
     // Immediately show the window in a loading state.
     setSelectedCell({ key, position, isLoading: true });
