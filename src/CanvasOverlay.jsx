@@ -21,12 +21,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
         this.canvas.style.position = 'absolute';
         this.canvas.style.pointerEvents = 'none';
 
-        // --- BUILT-IN VISUAL DEBUGGING ---
-        // The canvas will have a semi-transparent green background.
-        // If you see a green layer, the canvas is being rendered.
-        // If the green layer is misaligned, we know the positioning is wrong.
-        this.canvas.style.backgroundColor = 'rgba(0, 255, 0, 0.1)';
-        // --- END DEBUGGING ---
+        // The visual debugging background has been removed.
 
         cloudImage.onload = () => this.draw();
       }
@@ -107,9 +102,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
                 this.ctx.fillStyle = 'rgba(59, 130, 246, 0.4)';
                 this.ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
               }
-              this.ctx.strokeStyle = 'rgba(59, 130, 246, 0.75)';
-              this.ctx.lineWidth = 5;
-              this.ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
             }
           }
         }
