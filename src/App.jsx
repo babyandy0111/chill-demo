@@ -5,6 +5,7 @@ import Leaderboard from './Leaderboard.jsx';
 import Compass from './Compass.jsx';
 import RegistrationModal from './RegistrationModal.jsx';
 import InfoModal from './InfoModal.jsx';
+import CellInfoWindow from './CellInfoWindow.jsx'; // Import the new component
 
 const styles = {
   app: {
@@ -88,16 +89,32 @@ function App() {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [zoom, setZoom] = useState(10);
   const [claimedCells, setClaimedCells] = useState({});
+  const [selectedCell, setSelectedCell] = useState(null); // New state for the info window
   const mapRef = useRef(null);
 
-  const handleClaimCell = (cellKey, centerLat, centerLng) => {
+  // This function now handles both opening and closing the info window.
+  const handleSelectCell = (key, position) => {
+    // If clicking the currently selected cell, or a claimed cell, or clicking away, close the window.
+    if ((selectedCell && selectedCell.key === key) || claimedCells[key]) {
+      setSelectedCell(null);
+      return;
+    }
+    // Otherwise, open the window for the new cell.
+    setSelectedCell({ key, position });
+  };
+
+  // This function is called when the "Occupy" button is clicked
+  const handleClaimCell = () => {
+    if (!selectedCell) return;
+    const { key } = selectedCell;
+
     if (clouds > 0) {
       setClouds(clouds - 1);
       setClaimedCells(prev => ({
         ...prev,
-        [cellKey]: { owner: 'user', color: '#3B82F6' }
+        [key]: { owner: 'user', color: '#3B82F6' }
       }));
-      // The particle trigger call has been removed.
+      setSelectedCell(null); // Hide the info window after claiming
     } else {
       setIsModalOpen(true);
     }
@@ -155,11 +172,19 @@ function App() {
   return (
     <div style={styles.app}>
       <MapWithClouds 
-        onClaimCell={handleClaimCell}
+        onSelectCell={handleSelectCell}
         claimedCells={claimedCells}
         setMapRef={(map) => { mapRef.current = map; }}
         onZoomChanged={handleZoomChanged}
       />
+
+      {/* The CellInfoWindow is now a simple UI component rendered at the App level */}
+      {selectedCell && (
+        <CellInfoWindow
+          cell={selectedCell}
+          onClaim={handleClaimCell}
+        />
+      )}
 
       <div style={styles.topLeftControls}>
         <button style={styles.controlButton} onClick={handleZoomIn}>+</button>

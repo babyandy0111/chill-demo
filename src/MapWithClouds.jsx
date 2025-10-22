@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { GoogleMap, LoadScript } from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 
@@ -17,9 +17,7 @@ const mapStyles = [
   { featureType: "landscape.natural", elementType: "labels", stylers: [{ visibility: "off" }] },
 ];
 
-// This component is now much simpler. It only deals with the map and the grid overlay.
-// All particle logic has been lifted up to App.jsx.
-const MapWithClouds = ({ onClaimCell, claimedCells, setMapRef, onZoomChanged }) => {
+const MapWithClouds = ({ onSelectCell, claimedCells, setMapRef, onZoomChanged }) => {
   const [hoveredCell, setHoveredCell] = useState(null);
   const [zoom, setZoom] = useState(18);
   const [mapInstance, setMapInstance] = useState(null);
@@ -52,7 +50,11 @@ const MapWithClouds = ({ onClaimCell, claimedCells, setMapRef, onZoomChanged }) 
   };
 
   const handleClick = (e) => {
-    if (zoom < 15) return;
+    if (zoom < 15) {
+      onSelectCell(null, null);
+      return;
+    };
+
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
 
@@ -65,8 +67,7 @@ const MapWithClouds = ({ onClaimCell, claimedCells, setMapRef, onZoomChanged }) 
     const centerLat = south + GRID_SIZE / 2;
     const centerLng = west + GRID_SIZE / 2;
 
-    // Pass all necessary info up to the App component.
-    onClaimCell(key, centerLat, centerLng);
+    onSelectCell(key, { lat: centerLat, lng: centerLng });
   };
 
   return (
