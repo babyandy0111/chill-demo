@@ -1,95 +1,137 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { OverlayView } from '@react-google-maps/api';
+import { useEffect, useRef } from 'react';
+import cloudImageSrc from './assets/cloud.png';
 
 const GRID_SIZE = 0.0005;
 
-const CanvasOverlay = ({ bounds, zoom, claimedCells, hoveredCell }) => {
+const cloudImage = new Image();
+cloudImage.src = cloudImageSrc;
+
+const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
   const overlayRef = useRef(null);
-  const canvasRef = useRef(null);
 
-  const onOverlayLoad = useCallback((overlay) => {
-    overlayRef.current = overlay;
-    // Replace the draw method
-    overlay.draw = () => draw(overlay);
-  }, []);
+  useEffect(() => {
+    if (!map) return;
 
-  const onOverlayUnmount = useCallback((overlay) => {
-    overlay.draw = () => {};
-  }, []);
+    class IntegerBasedOverlay extends window.google.maps.OverlayView {
+      constructor() {
+        super();
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.props = {};
+        this.canvas.style.position = 'absolute';
+        this.canvas.style.left = '0px';
+        this.canvas.style.top = '0px';
+        this.canvas.style.pointerEvents = 'none';
+        cloudImage.onload = () => this.draw();
+      }
 
-  const draw = (overlay) => {
-    const projection = overlay.getProjection();
-    const map = overlay.getMap();
-    if (!projection || !map || !canvasRef.current) return;
+      setProps(props) {
+        this.props = props;
+      }
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const mapDiv = map.getDiv();
+      onAdd() {
+        const panes = this.getPanes();
+        panes.overlayLayer.appendChild(this.canvas);
+      }
 
-    if (canvas.width !== mapDiv.clientWidth) canvas.width = mapDiv.clientWidth;
-    if (canvas.height !== mapDiv.clientHeight) canvas.height = mapDiv.clientHeight;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (zoom < 17) return;
-
-    const currentBounds = map.getBounds();
-    if (!currentBounds) return;
-
-    const ne = currentBounds.getNorthEast();
-    const sw = currentBounds.getSouthWest();
-
-    const startLat = Math.floor(sw.lat() / GRID_SIZE) * GRID_SIZE;
-    const startLng = Math.floor(sw.lng() / GRID_SIZE) * GRID_SIZE;
-
-    for (let lat = startLat; lat < ne.lat() + GRID_SIZE; lat += GRID_SIZE) {
-      for (let lng = startLng; lng < ne.lng() + GRID_SIZE; lng += GRID_SIZE) {
-        const key = `${lat}_${lng}`;
-        const cellSW = new window.google.maps.LatLng(lat, lng);
-        const cellNE = new window.google.maps.LatLng(lat + GRID_SIZE, lng + GRID_SIZE);
-
-        const swPixel = projection.fromLatLngToDivPixel(cellSW);
-        const nePixel = projection.fromLatLngToDivPixel(cellNE);
-
-        if (!swPixel || !nePixel) continue;
-
-        ctx.beginPath();
-        ctx.rect(swPixel.x, nePixel.y, nePixel.x - swPixel.x, swPixel.y - nePixel.y);
-
-        if (claimedCells[key]) {
-          ctx.fillStyle = 'rgba(59, 130, 246, 0.7)';
-          ctx.fill();
-        } else if (key === hoveredCell) {
-          ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
-          ctx.fill();
-        } else {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-          ctx.fill();
+      onRemove() {
+        if (this.canvas.parentElement) {
+          this.canvas.parentElement.removeChild(this.canvas);
         }
+      }
 
-        ctx.strokeStyle = '#FFFF00';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+      draw() {
+        const projection = this.getProjection();
+        if (!projection || !this.canvas) return;
+
+        const { zoom, claimedCells, hoveredCell } = this.props;
+
+        const mapDiv = map.getDiv();
+        const mapWidth = mapDiv.clientWidth;
+        const mapHeight = mapDiv.clientHeight;
+
+        if (this.canvas.width !== mapWidth) this.canvas.width = mapWidth;
+        if (this.canvas.height !== mapHeight) this.canvas.height = mapHeight;
+
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        if (zoom < 17) return;
+
+        const bounds = map.getBounds();
+        if (!bounds) return;
+
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+
+        // --- THE FUNDAMENTAL FIX: INTEGER-BASED LOOP ---
+        // 1. Calculate the integer indices for the visible area.
+        const startIY = Math.floor(sw.lat() / GRID_SIZE);
+        const startIX = Math.floor(sw.lng() / GRID_SIZE);
+        const endIY = Math.floor(ne.lat() / GRID_SIZE);
+        const endIX = Math.floor(ne.lng() / GRID_SIZE);
+
+        // 2. Loop through the integer indices.
+        for (let iy = startIY; iy <= endIY; iy++) {
+          for (let ix = startIX; ix <= endIX; ix++) {
+            
+            // 3. The key is now generated directly from pure integers.
+            const key = `${iy}_${ix}`;
+            
+            // 4. Calculate the geographical coordinates from the integer indices for drawing.
+            const south = iy * GRID_SIZE;
+            const west = ix * GRID_SIZE;
+            
+            const cellSW = new window.google.maps.LatLng(south, west);
+            const cellNE = new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE);
+            
+            const swPixel = projection.fromLatLngToDivPixel(cellSW);
+            const nePixel = projection.fromLatLngToDivPixel(cellNE);
+
+            if (!swPixel || !nePixel) continue;
+
+            const rectX = swPixel.x;
+            const rectY = nePixel.y;
+            const rectWidth = nePixel.x - swPixel.x;
+            const rectHeight = swPixel.y - nePixel.y;
+
+            if (claimedCells && claimedCells[key]) {
+              if (cloudImage.complete) {
+                this.ctx.drawImage(cloudImage, rectX, rectY, rectWidth, rectHeight);
+              }
+            } 
+            else {
+              if (key === hoveredCell) {
+                this.ctx.fillStyle = 'rgba(59, 130, 246, 0.4)';
+                this.ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
+              }
+              this.ctx.strokeStyle = 'rgba(59, 130, 246, 0.75)';
+              this.ctx.lineWidth = 5;
+              this.ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+            }
+          }
+        }
       }
     }
-  };
 
-  // Redraw when props change
-  useEffect(() => {
-    if (overlayRef.current) {
-      overlayRef.current.draw();
+    if (!overlayRef.current) {
+      overlayRef.current = new IntegerBasedOverlay();
+      overlayRef.current.setMap(map);
     }
-  }, [bounds, zoom, claimedCells, hoveredCell]);
 
-  return (
-    <OverlayView
-      mapPaneName={OverlayView.MAP_PANE}
-      onLoad={onOverlayLoad}
-      onUnmount={onOverlayUnmount}
-    >
-      <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} />
-    </OverlayView>
-  );
+    overlayRef.current.setProps({ zoom, claimedCells, hoveredCell });
+    overlayRef.current.draw();
+
+  }, [map, zoom, claimedCells, hoveredCell]);
+
+  useEffect(() => {
+    return () => {
+      if (overlayRef.current) {
+        overlayRef.current.setMap(null);
+      }
+    };
+  }, []);
+
+  return null;
 };
 
 export default CanvasOverlay;

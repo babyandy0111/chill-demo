@@ -1,8 +1,7 @@
 import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef } from "react";
-import { GoogleMap, LoadScript, Marker } from "@react-google-maps/api";
+import { GoogleMap, LoadScript } from "@react-google-maps/api";
 import Particles from "react-particles";
 import { particlesOptions } from "./cloud-particles-config.jsx";
-import cloudImage from "./assets/cloud.png";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 
 const GRID_SIZE = 0.0005;
@@ -11,7 +10,7 @@ const mapContainerStyle = { width: "100%", height: "100%" };
 const center = { lat: 25.0330, lng: 121.5654 };
 const particlesStyle = {
   position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
-  zIndex: 5, pointerEvents: "none",
+  zIndex: 200, pointerEvents: "none",
 };
 const mapRootStyle = {
   position: 'absolute', inset: '0px', width: '100%', height: '100%',
@@ -24,17 +23,10 @@ const mapStyles = [
   { featureType: "landscape.natural", elementType: "labels", stylers: [{ visibility: "off" }] },
 ];
 
-const getGridKey = (lat, lng) => {
-  const south = Math.floor(lat / GRID_SIZE) * GRID_SIZE;
-  const west = Math.floor(lng / GRID_SIZE) * GRID_SIZE;
-  return `${south}_${west}`;
-};
-
 const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoomChanged }, ref) => {
-  const [bounds, setBounds] = useState(null);
   const [hoveredCell, setHoveredCell] = useState(null);
   const [zoom, setZoom] = useState(18);
-  const mapInstanceRef = useRef(null);
+  const [mapInstance, setMapInstance] = useState(null); // State to hold the map instance
   const particlesContainerRef = useRef(null);
 
   const onParticlesLoaded = useCallback(container => {
@@ -43,8 +35,8 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
 
   useImperativeHandle(ref, () => ({
     triggerParticles(lat, lng) {
-      if (particlesContainerRef.current && mapInstanceRef.current) {
-        const projection = mapInstanceRef.current.getProjection();
+      if (particlesContainerRef.current && mapInstance) {
+        const projection = mapInstance.getProjection();
         if (!projection) return;
         const domPoint = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(lat, lng));
         if (domPoint) {
@@ -57,18 +49,16 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
   }));
 
   const handleMapLoad = useCallback((map) => {
-    mapInstanceRef.current = map;
+    setMapInstance(map); // Save the map instance to state
     setMapRef(map);
     setZoom(map.getZoom());
-    setBounds(map.getBounds());
   }, [setMapRef]);
 
   const handleIdle = () => {
-    if (mapInstanceRef.current) {
-      const newZoom = mapInstanceRef.current.getZoom();
+    if (mapInstance) {
+      const newZoom = mapInstance.getZoom();
       onZoomChanged(newZoom);
       setZoom(newZoom);
-      setBounds(mapInstanceRef.current.getBounds());
     }
   };
 
@@ -77,7 +67,8 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
       if (hoveredCell) setHoveredCell(null);
       return;
     }
-    const key = getGridKey(e.latLng.lat(), e.latLng.lng());
+    // Use integer-based key to avoid float precision issues.
+    const key = `${Math.floor(e.latLng.lat() / GRID_SIZE)}_${Math.floor(e.latLng.lng() / GRID_SIZE)}`;
     if (key !== hoveredCell) setHoveredCell(key);
   };
 
@@ -87,10 +78,19 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
 
   const handleClick = (e) => {
     if (zoom < 17) return;
-    const south = Math.floor(e.latLng.lat() / GRID_SIZE) * GRID_SIZE;
-    const west = Math.floor(e.latLng.lng() / GRID_SIZE) * GRID_SIZE;
-    const cellBounds = { north: south + GRID_SIZE, south, east: west + GRID_SIZE, west };
-    onClaimCell(cellBounds);
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+
+    // Use integer-based key to avoid float precision issues.
+    const key = `${Math.floor(lat / GRID_SIZE)}_${Math.floor(lng / GRID_SIZE)}`;
+    
+    // Calculate center for the particle effect.
+    const south = Math.floor(lat / GRID_SIZE) * GRID_SIZE;
+    const west = Math.floor(lng / GRID_SIZE) * GRID_SIZE;
+    const centerLat = south + GRID_SIZE / 2;
+    const centerLng = west + GRID_SIZE / 2;
+
+    onClaimCell(key, centerLat, centerLng);
   };
 
   return (
@@ -112,29 +112,19 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
           onMouseOut={handleMouseOut}
           onClick={handleClick}
         >
+          {/* The new CanvasOverlay receives the map instance and handles all drawing */}
           <CanvasOverlay
-            bounds={bounds}
+            map={mapInstance}
             zoom={zoom}
             claimedCells={claimedCells}
             hoveredCell={hoveredCell}
           />
 
-          {Object.keys(claimedCells).map((key) => {
-            const [lat, lng] = key.split('_').map(Number);
-            const cellCenter = { lat: lat + GRID_SIZE / 2, lng: lng + GRID_SIZE / 2 };
-            return (
-              <Marker
-                key={`marker-${key}`}
-                position={cellCenter}
-                icon={{
-                  url: cloudImage,
-                  scaledSize: new window.google.maps.Size(40, 40),
-                  anchor: new window.google.maps.Point(20, 20),
-                }}
-                clickable={false}
-              />
-            );
-          })}
+          {/* 
+            We no longer need to render Markers here. 
+            The CanvasOverlay is now responsible for drawing the claimed cells.
+            This is much more performant.
+          */}
         </GoogleMap>
       </LoadScript>
     </div>

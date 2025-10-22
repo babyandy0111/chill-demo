@@ -91,16 +91,13 @@ function App() {
   const mapRef = useRef(null);
   const particlesRef = useRef(null);
 
-  const handleClaimCell = (cellBounds) => {
+  const handleClaimCell = (cellKey, centerLat, centerLng) => {
     if (clouds > 0) {
       setClouds(clouds - 1);
-      const cellKey = `${cellBounds.south}_${cellBounds.west}`;
       setClaimedCells(prev => ({
         ...prev,
         [cellKey]: { owner: 'user', color: '#3B82F6' }
       }));
-      const centerLat = (cellBounds.north + cellBounds.south) / 2;
-      const centerLng = (cellBounds.east + cellBounds.west) / 2;
       if (particlesRef.current) {
         particlesRef.current.triggerParticles(centerLat, centerLng);
       }
