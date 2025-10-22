@@ -3,54 +3,41 @@ import { OverlayView } from '@react-google-maps/api';
 
 const GRID_SIZE = 0.0005;
 
-const CanvasOverlay = ({ claimedCells, hoveredCell, zoom }) => {
+const CanvasOverlay = ({ bounds, zoom, claimedCells, hoveredCell }) => {
   const overlayRef = useRef(null);
-  const drawRequestRef = useRef(null);
+  const canvasRef = useRef(null);
 
   const onOverlayLoad = useCallback((overlay) => {
     overlayRef.current = overlay;
-    // We are replacing the onDraw method with our own implementation.
-    overlay.draw = () => {
-      // Use requestAnimationFrame to debounce drawing and improve performance
-      if (drawRequestRef.current) {
-        cancelAnimationFrame(drawRequestRef.current);
-      }
-      drawRequestRef.current = requestAnimationFrame(() => {
-        draw(overlay);
-      });
-    };
+    // Replace the draw method
+    overlay.draw = () => draw(overlay);
   }, []);
 
   const onOverlayUnmount = useCallback((overlay) => {
-    // Restore the original draw method on unmount
     overlay.draw = () => {};
-    if (drawRequestRef.current) {
-      cancelAnimationFrame(drawRequestRef.current);
-    }
   }, []);
 
   const draw = (overlay) => {
     const projection = overlay.getProjection();
     const map = overlay.getMap();
-    if (!projection || !map) return;
+    if (!projection || !map || !canvasRef.current) return;
 
-    const canvas = overlay.getPanes().overlayLayer.querySelector('canvas');
-    if (!canvas) return;
-
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
     const mapDiv = map.getDiv();
+
     if (canvas.width !== mapDiv.clientWidth) canvas.width = mapDiv.clientWidth;
     if (canvas.height !== mapDiv.clientHeight) canvas.height = mapDiv.clientHeight;
 
-    const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (zoom < 17) return;
 
-    const bounds = map.getBounds();
-    if (!bounds) return;
+    const currentBounds = map.getBounds();
+    if (!currentBounds) return;
 
-    const ne = bounds.getNorthEast();
-    const sw = bounds.getSouthWest();
+    const ne = currentBounds.getNorthEast();
+    const sw = currentBounds.getSouthWest();
 
     const startLat = Math.floor(sw.lat() / GRID_SIZE) * GRID_SIZE;
     const startLng = Math.floor(sw.lng() / GRID_SIZE) * GRID_SIZE;
@@ -92,7 +79,7 @@ const CanvasOverlay = ({ claimedCells, hoveredCell, zoom }) => {
     if (overlayRef.current) {
       overlayRef.current.draw();
     }
-  }, [claimedCells, hoveredCell, zoom]);
+  }, [bounds, zoom, claimedCells, hoveredCell]);
 
   return (
     <OverlayView
@@ -100,7 +87,7 @@ const CanvasOverlay = ({ claimedCells, hoveredCell, zoom }) => {
       onLoad={onOverlayLoad}
       onUnmount={onOverlayUnmount}
     >
-      <canvas style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} />
+      <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} />
     </OverlayView>
   );
 };

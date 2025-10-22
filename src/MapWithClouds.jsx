@@ -3,7 +3,7 @@ import { GoogleMap, LoadScript, Marker } from "@react-google-maps/api";
 import Particles from "react-particles";
 import { particlesOptions } from "./cloud-particles-config.jsx";
 import cloudImage from "./assets/cloud.png";
-import CanvasOverlay from "./CanvasOverlay.jsx"; // Import the new overlay component
+import CanvasOverlay from "./CanvasOverlay.jsx";
 
 const GRID_SIZE = 0.0005;
 
@@ -31,6 +31,7 @@ const getGridKey = (lat, lng) => {
 };
 
 const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoomChanged }, ref) => {
+  const [bounds, setBounds] = useState(null);
   const [hoveredCell, setHoveredCell] = useState(null);
   const [zoom, setZoom] = useState(18);
   const mapInstanceRef = useRef(null);
@@ -59,6 +60,7 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
     mapInstanceRef.current = map;
     setMapRef(map);
     setZoom(map.getZoom());
+    setBounds(map.getBounds());
   }, [setMapRef]);
 
   const handleIdle = () => {
@@ -66,16 +68,17 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
       const newZoom = mapInstanceRef.current.getZoom();
       onZoomChanged(newZoom);
       setZoom(newZoom);
+      setBounds(mapInstanceRef.current.getBounds());
     }
   };
 
   const handleMouseMove = (e) => {
     if (zoom < 17) {
-      setHoveredCell(null);
+      if (hoveredCell) setHoveredCell(null);
       return;
     }
     const key = getGridKey(e.latLng.lat(), e.latLng.lng());
-    setHoveredCell(key);
+    if (key !== hoveredCell) setHoveredCell(key);
   };
 
   const handleMouseOut = () => {
@@ -110,9 +113,10 @@ const MapWithClouds = forwardRef(({ onClaimCell, claimedCells, setMapRef, onZoom
           onClick={handleClick}
         >
           <CanvasOverlay
+            bounds={bounds}
+            zoom={zoom}
             claimedCells={claimedCells}
             hoveredCell={hoveredCell}
-            zoom={zoom}
           />
 
           {Object.keys(claimedCells).map((key) => {
