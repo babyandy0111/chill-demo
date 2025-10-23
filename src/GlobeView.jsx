@@ -1,14 +1,25 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
+import {useNavigate} from 'react-router-dom'; // Import useNavigate
 import Globe from 'react-globe.gl';
 import countriesData from './assets/countries.json';
 
 const GlobeView = () => {
     const globeEl = useRef();
     const [hoveredPolygon, setHoveredPolygon] = useState(null);
+    const navigate = useNavigate(); // Initialize the navigate function
+
+    useEffect(() => {
+        if (globeEl.current) {
+            globeEl.current.controls().autoRotate = true;
+            globeEl.current.controls().autoRotateSpeed = 0.15;
+            globeEl.current.controls().minDistance = 250;
+            globeEl.current.controls().maxDistance = 500;
+        }
+    }, []);
 
     const handlePolygonClick = (polygon, event, {lat, lng}) => {
-        console.log('Clicked on:', polygon);
-        console.log(`Clicked coordinates: Lat: ${lat}, Lng: ${lng}`);
+        // Navigate to the map view with the clicked coordinates
+        navigate(`/map/${lat}/${lng}`);
     };
 
     return (

@@ -7,7 +7,6 @@ import CurrentUserLocationMarker from "./CurrentUserLocationMarker.jsx";
 const GRID_SIZE = 0.0005;
 
 const mapContainerStyle = { width: "100%", height: "100%" };
-const center = { lat: 25.0330, lng: 121.5654 };
 const mapRootStyle = {
   position: 'absolute', inset: '0px', width: '100%', height: '100%',
 };
@@ -19,9 +18,9 @@ const mapStyles = [
   { featureType: "landscape.natural", elementType: "labels", stylers: [{ visibility: "off" }] },
 ];
 
-const MapWithClouds = ({ onSelectCell, claimedCells, setMapRef, onZoomChanged, selectedCell, onClaim, userLocation }) => {
+const MapWithClouds = ({ center, onSelectCell, claimedCells, setMapRef, onZoomChanged, selectedCell, onClaim, userLocation }) => {
   const [hoveredCell, setHoveredCell] = useState(null);
-  const [zoom, setZoom] = useState(18);
+  const [zoom, setZoom] = useState(12);
   const [mapInstance, setMapInstance] = useState(null);
 
   const handleMapLoad = useCallback((map) => {
@@ -78,7 +77,7 @@ const MapWithClouds = ({ onSelectCell, claimedCells, setMapRef, onZoomChanged, s
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
           center={center}
-          zoom={18}
+          zoom={12}
           options={{
             disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: false,
             tilt: 0, mapTypeId: 'roadmap',
