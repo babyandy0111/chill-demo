@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom'; // Import useNavigate
 import Globe from 'react-globe.gl';
 import countriesData from './assets/countries.json';
+import earthImage from './assets/earth-8k.jpg'; // Import the local image
 
 const GlobeView = () => {
     const globeEl = useRef();
@@ -12,7 +13,7 @@ const GlobeView = () => {
         if (globeEl.current) {
             globeEl.current.controls().autoRotate = true;
             globeEl.current.controls().autoRotateSpeed = 0.15;
-            globeEl.current.controls().minDistance = 250;
+            globeEl.current.controls().minDistance = 150;
             globeEl.current.controls().maxDistance = 500;
         }
     }, []);
@@ -25,7 +26,7 @@ const GlobeView = () => {
     return (
         <Globe
             ref={globeEl}
-            globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+            globeImageUrl={earthImage}
             bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
 
             polygonsData={countriesData.features}
