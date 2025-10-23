@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { GoogleMap, LoadScript } from "@react-google-maps/api";
+import { GoogleMap } from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 import CellInfoWindow from "./CellInfoWindow.jsx";
 import CurrentUserLocationMarker from "./CurrentUserLocationMarker.jsx";
@@ -73,42 +73,40 @@ const MapWithClouds = ({ center, onSelectCell, claimedCells, setMapRef, onZoomCh
 
   return (
     <div style={mapRootStyle}>
-      <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={center}
-          zoom={12}
-          options={{
-            disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: false,
-            tilt: 0, mapTypeId: 'roadmap',
-            styles: mapStyles,
-          }}
-          onLoad={handleMapLoad}
-          onIdle={handleIdle}
-          onMouseMove={handleMouseMove}
-          onMouseOut={handleMouseOut}
-          onClick={handleClick}
-        >
-          <CanvasOverlay
-            map={mapInstance}
-            zoom={zoom}
-            claimedCells={claimedCells}
-            hoveredCell={hoveredCell}
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={center}
+        zoom={12}
+        options={{
+          disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: false,
+          tilt: 0, mapTypeId: 'roadmap',
+          styles: mapStyles,
+        }}
+        onLoad={handleMapLoad}
+        onIdle={handleIdle}
+        onMouseMove={handleMouseMove}
+        onMouseOut={handleMouseOut}
+        onClick={handleClick}
+      >
+        <CanvasOverlay
+          map={mapInstance}
+          zoom={zoom}
+          claimedCells={claimedCells}
+          hoveredCell={hoveredCell}
+        />
+
+        {/* Both the InfoWindow and the LocationMarker are now correctly rendered here */}
+        {selectedCell && (
+          <CellInfoWindow
+            cellInfo={selectedCell}
+            onClaim={onClaim}
           />
+        )}
 
-          {/* Both the InfoWindow and the LocationMarker are now correctly rendered here */}
-          {selectedCell && (
-            <CellInfoWindow
-              cellInfo={selectedCell}
-              onClaim={onClaim}
-            />
-          )}
-
-          {userLocation && (
-            <CurrentUserLocationMarker position={userLocation} />
-          )}
-        </GoogleMap>
-      </LoadScript>
+        {userLocation && (
+          <CurrentUserLocationMarker position={userLocation} />
+        )}
+      </GoogleMap>
     </div>
   );
 };

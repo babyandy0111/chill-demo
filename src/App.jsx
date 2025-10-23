@@ -1,5 +1,6 @@
 import React, {useState, useRef, useEffect} from 'react';
-import {useParams} from 'react-router-dom'; // Import useParams
+import {useParams} from 'react-router-dom';
+import { useJsApiLoader } from '@react-google-maps/api';
 import MapWithClouds from './MapWithClouds.jsx';
 import CloudCounter from './CloudCounter.jsx';
 import Leaderboard from './Leaderboard.jsx';
@@ -87,6 +88,11 @@ const smoothAnimate = (map, targetCenter, duration, targetZoom = null) => {
 function App() {
     const {lat, lng} = useParams();
     const [center, setCenter] = useState(null);
+
+    const { isLoaded } = useJsApiLoader({
+        id: 'google-map-script',
+        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    });
 
     useEffect(() => {
         if (lat && lng) {
@@ -241,7 +247,7 @@ function App() {
         setIsInfoModalOpen(true);
     };
 
-    if (!center) {
+    if (!isLoaded || !center) {
         return <div>地圖載入中...</div>;
     }
 
