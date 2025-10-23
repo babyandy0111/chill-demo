@@ -7,20 +7,21 @@ import App from "./App.jsx"; // Import the App component
 
 // Create a browser router with route configuration
 const router = createBrowserRouter([
-    {
-        path: '/',
-            element: <GlobeView />,
-          },
-          {
-            path: '/map', // Add route for /map without params
-            element: <App />,
-          },
-          {
-            path: '/map/:lat/:lng',
-            element: <App />,
-          },
-        ]);
-
+  {
+    path: '/',
+    element: <GlobeView />,
+  },
+  {
+    path: '/map', // Add route for /map without params
+    element: <App />,
+  },
+  {
+    path: '/map/:lat/:lng',
+    element: <App />,
+  },
+], {
+  basename: "/chill-demo", // Set the basename for GitHub Pages
+});
 createRoot(document.getElementById('root')).render(
     <StrictMode>
         <RouterProvider router={router}/>
