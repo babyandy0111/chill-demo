@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import cesium from 'vite-plugin-cesium';
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => {
@@ -12,7 +11,7 @@ export default defineConfig(({ command }) => {
   } else {
     return {
       base: '/', // For local development
-      plugins: [react(),cesium()],
+      plugins: [react()],
     }
   }
 })
