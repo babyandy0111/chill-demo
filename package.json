@@ -6,7 +6,7 @@
   "homepage": "https://babyandy0111.github.io/chill-demo",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && cp dist/index.html dist/404.html",
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build",
