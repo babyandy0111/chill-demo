@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { GoogleMap } from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 import CellInfoWindow from "./CellInfoWindow.jsx";
@@ -22,6 +22,7 @@ const MapWithClouds = ({ center, onSelectCell, claimedCells, setMapRef, onZoomCh
   const [hoveredCell, setHoveredCell] = useState(null);
   const [zoom, setZoom] = useState(3); // Start with a zoomed-out view
   const [mapInstance, setMapInstance] = useState(null);
+  const throttleTimeout = useRef(null);
 
   const handleMapLoad = useCallback((map) => {
     setMapInstance(map);
@@ -65,12 +66,22 @@ const MapWithClouds = ({ center, onSelectCell, claimedCells, setMapRef, onZoomCh
   };
 
   const handleMouseMove = (e) => {
-    if (zoom < 15) {
-      if (hoveredCell) setHoveredCell(null);
+    if (throttleTimeout.current) {
       return;
     }
-    const key = `${Math.floor(e.latLng.lat() / GRID_SIZE)}_${Math.floor(e.latLng.lng() / GRID_SIZE)}`;
-    if (key !== hoveredCell) setHoveredCell(key);
+
+    throttleTimeout.current = setTimeout(() => {
+      throttleTimeout.current = null;
+
+      if (zoom < 15) {
+        if (hoveredCell) setHoveredCell(null);
+        return;
+      }
+      const key = `${Math.floor(e.latLng.lat() / GRID_SIZE)}_${Math.floor(e.latLng.lng() / GRID_SIZE)}`;
+      if (key !== hoveredCell) {
+        setHoveredCell(key);
+      }
+    }, 50); // Throttle to update every 50ms
   };
 
   const handleMouseOut = () => {
