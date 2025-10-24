@@ -2,14 +2,12 @@ import { useEffect, useRef } from 'react';
 import cloudImageSrc from './assets/cloud.png';
 
 const GRID_SIZE = 0.0005;
-
 const cloudImage = new Image();
 cloudImage.src = cloudImageSrc;
 
 const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
     const overlayRef = useRef(null);
 
-    // Effect for creating, managing, and cleaning up the overlay
     useEffect(() => {
         if (!map) return;
 
@@ -166,14 +164,17 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
         };
     }, [map]);
 
-    // Effect for redrawing static content (clouds)
     useEffect(() => {
         if (!overlayRef.current) return;
-        overlayRef.current.setProps({ zoom, claimedCells });
-        overlayRef.current.drawStatic();
-    }, [zoom, claimedCells]);
+        overlayRef.current.setProps({ zoom });
+    }, [zoom]);
 
-    // Effect for redrawing dynamic content (hover)
+    useEffect(() => {
+        if (!overlayRef.current) return;
+        overlayRef.current.setProps({ claimedCells });
+        overlayRef.current.drawStatic();
+    }, [claimedCells]);
+
     useEffect(() => {
         if (!overlayRef.current) return;
         overlayRef.current.setProps({ hoveredCell });
