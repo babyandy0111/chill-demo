@@ -38,6 +38,14 @@ const MapWithClouds = ({
         setMapRef(map);
     }, [setMapRef]);
 
+    const handleIdle = useCallback(() => {
+        if (mapInstance) {
+            const newZoom = mapInstance.getZoom();
+            onZoomChanged(newZoom);
+            setZoom(newZoom);
+        }
+    }, [mapInstance, onZoomChanged]);
+
     useEffect(() => {
         if (mapInstance) {
             const flyToTimeout = setTimeout(() => {
@@ -59,97 +67,45 @@ const MapWithClouds = ({
                 clearTimeout(flyToTimeout);
             };
         }
-    }, [mapInstance, center]);
+    }, [mapInstance, center, handleIdle]);
 
-        const handleIdle = useCallback(() => {
-
-            if (mapInstance) {
-
-                const newZoom = mapInstance.getZoom();
-
-                onZoomChanged(newZoom);
-
-                setZoom(newZoom);
-
-            }
-
-        }, [mapInstance, onZoomChanged]);
-
-    
-
-        const handleMouseMove = useCallback((e) => {
-
-            if (throttleTimeout.current) {
-
-                return;
-
-            }
-
-            throttleTimeout.current = setTimeout(() => {
-
-                throttleTimeout.current = null;
-
-                if (zoom < 15) {
-
-                    if (hoveredCell) setHoveredCell(null);
-
-                    return;
-
-                }
-
-                const key = `${Math.floor(e.latLng.lat() / GRID_SIZE)}_${Math.floor(e.latLng.lng() / GRID_SIZE)}`;
-
-                if (key !== hoveredCell) {
-
-                    setHoveredCell(key);
-
-                }
-
-            }, 50);
-
-        }, [zoom, hoveredCell, setHoveredCell]);
-
-    
-
-        const handleMouseOut = useCallback(() => {
-
-            setHoveredCell(null);
-
-        }, [setHoveredCell]);
-
-    
-
-        const handleClick = useCallback((e) => {
-
+    const handleMouseMove = useCallback((e) => {
+        if (throttleTimeout.current) {
+            return;
+        }
+        throttleTimeout.current = setTimeout(() => {
+            throttleTimeout.current = null;
             if (zoom < 15) {
-
-                onSelectCell(null, null);
-
+                if (hoveredCell) setHoveredCell(null);
                 return;
-
             }
+            const key = `${Math.floor(e.latLng.lat() / GRID_SIZE)}_${Math.floor(e.latLng.lng() / GRID_SIZE)}`;
+            if (key !== hoveredCell) {
+                setHoveredCell(key);
+            }
+        }, 50);
+    }, [zoom, hoveredCell, setHoveredCell]);
 
-            const lat = e.latLng.lat();
+    const handleMouseOut = useCallback(() => {
+        setHoveredCell(null);
+    }, [setHoveredCell]);
 
-            const lng = e.latLng.lng();
-
-            const iy = Math.floor(lat / GRID_SIZE);
-
-            const ix = Math.floor(lng / GRID_SIZE);
-
-            const key = `${iy}_${ix}`;
-
-            const south = iy * GRID_SIZE;
-
-            const west = ix * GRID_SIZE;
-
-            const centerLat = south + GRID_SIZE / 2;
-
-            const centerLng = west + GRID_SIZE / 2;
-
-            onSelectCell(key, { lat: centerLat, lng: centerLng });
-
-        }, [zoom, onSelectCell]);
+    const handleClick = useCallback((e) => {
+        if (zoom < 15) {
+            onSelectCell(null, null);
+            return;
+        }
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        const iy = Math.floor(lat / GRID_SIZE);
+        const ix = Math.floor(lng / GRID_SIZE);
+        const key = `${iy}_${ix}`;
+        const south = iy * GRID_SIZE;
+        const west = ix * GRID_SIZE;
+        const centerLat = south + GRID_SIZE / 2;
+        const centerLng = west + GRID_SIZE / 2;
+        onSelectCell(key, {lat: centerLat, lng: centerLng});
+    }, [zoom, onSelectCell]);
 
     return (
         <div className="view-container fade-in" style={mapRootStyle}>
