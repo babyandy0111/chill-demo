@@ -214,27 +214,20 @@ function App() {
         setIsModalOpen(false);
     }, []);
 
-    const handleReturnToGlobe = useCallback(() => {
+    const handleReturnToGlobe = useCallback(async () => {
         if (!mapRef.current) return;
 
         const currentCenter = mapRef.current.getCenter();
         const lat = currentCenter.lat();
         const lng = currentCenter.lng();
 
-        setIsReturning(true); // Trigger the zoom-out-fade animation
+        setIsReturning(true); // This can be used for CSS fade-out effects if needed
 
-        // Animate the zoom out
-        let currentZoom = mapRef.current.getZoom();
-        const zoomOutInterval = setInterval(() => {
-            if (currentZoom > 2) {
-                currentZoom -= 0.5; // Zoom out in steps
-                mapRef.current.setZoom(currentZoom);
-            } else {
-                clearInterval(zoomOutInterval);
-                // After animation, navigate with state
-                navigate('/', {state: {lat, lng}});
-            }
-        }, 50); // Adjust interval for animation speed
+        // Use smoothAnimate for a fluid zoom-out
+        await smoothAnimate(mapRef.current, { lat, lng }, 1500, 2);
+
+        // After animation, navigate with state
+        navigate('/', { state: { lat, lng } });
     }, [navigate]);
 
     const handleCompassClick = useCallback(async () => {
