@@ -171,7 +171,7 @@ function App() {
                 const country = address.find(c => c.types.includes('country'));
                 const region = address.find(c => c.types.includes('administrative_area_level_1'));
 
-                const countryName = country ? country.long_name : '未知水域';
+                const countryName = country ? country.long_name : '未知領域';
                 const countryCode = country ? country.short_name.toLowerCase() : null;
                 const regionName = region ? region.long_name : '';
                 const flagUrl = countryCode ? `https://flagcdn.com/w40/${countryCode}.png` : null;
@@ -292,7 +292,7 @@ function App() {
     }
 
     return (
-        <div style={styles.app}>
+        <div style={styles.app} className={isReturning ? 'map-container-fade-out' : ''}>
             <MapWithClouds
                 center={center} // Pass the center to the map
                 onSelectCell={handleSelectCell}

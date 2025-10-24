@@ -63,7 +63,7 @@ const GlobeView = () => {
     const handleGlobeClick = ({ lat, lng }) => {
         if (!globeEl.current || isTransitioning) return;
 
-        const transitionDuration = 2000; // 2 seconds
+        const transitionDuration = 1500; // 2 seconds
 
         // 1. Animate the globe to fly into the clicked point
         globeEl.current.controls().autoRotate = false;
@@ -75,7 +75,7 @@ const GlobeView = () => {
             // A small delay for the fade-out to start before navigating
             setTimeout(() => {
                 navigate(`/map/${lat}/${lng}`);
-            }, 300);
+            }, 100);
         }, transitionDuration);
     };
 

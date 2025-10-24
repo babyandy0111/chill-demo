@@ -67,5 +67,17 @@
 }
 
 .fade-out {
+
   animation-name: fade-out;
+
+}
+
+
+
+.map-container-fade-out {
+
+  animation: fade-out 1.5s forwards;
+
+  pointer-events: none; /* Disable interaction during fade-out */
+
 }
