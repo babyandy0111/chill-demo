@@ -29,18 +29,37 @@ const GlobeView = () => {
     const transitionToMap = (coords) => {
         if (!globeEl.current || isTransitioning) return;
 
-        setIsTransitioning(true);
+        // --- Configuration for the multi-stage animation ---
+        const panDuration = 1500;     // 1.5s to fly over the location
+        const zoomDuration = 1500;    // 1.5s to zoom into the ground
+        const fadeStartDelay = 1000;  // Start fade 1s into the zoom animation
+        const finalNavDelay = panDuration + zoomDuration + 200; // Total animation time + buffer
 
-        // 1. Stop autorotate and point camera to the location
+        // --- Start Animation Sequence ---
+        
+        // 1. Stop autorotation immediately
         globeEl.current.controls().autoRotate = false;
-        // Slower, more cinematic swoop animation (2.5 seconds)
-        globeEl.current.pointOfView({ lat: coords.lat, lng: coords.lng, altitude: 0.5 }, 2500); 
 
-        // 2. After a delay, navigate
-        // Delay is slightly longer than the animation to allow fade-out to complete
+        // 2. Phase 1: Pan to the location while staying high up.
+        globeEl.current.pointOfView({ lat: coords.lat, lng: coords.lng, altitude: 1.5 }, panDuration);
+
+        // 3. Use a timeout to chain the next animation phase.
+        setTimeout(() => {
+            // Phase 2: Zoom in to the location.
+            // The altitude is set very low to simulate zooming to the minDistance.
+            globeEl.current.pointOfView({ lat: coords.lat, lng: coords.lng, altitude: 0.01 }, zoomDuration);
+
+            // Set another nested timeout to trigger the fade *during* the zoom.
+            setTimeout(() => {
+                setIsTransitioning(true); // This triggers the .fade-out CSS class
+            }, fadeStartDelay);
+
+        }, panDuration);
+
+        // 4. Set a final timeout to navigate after the entire animation sequence is complete.
         setTimeout(() => {
             navigate(`/map/${coords.lat}/${coords.lng}`);
-        }, 2700);
+        }, finalNavDelay);
     };
 
     const handlePolygonClick = (polygon, event, { lat, lng }) => {
