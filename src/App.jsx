@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect} from 'react';
+import React, {useState, useRef, useEffect, useCallback} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
 import {useJsApiLoader} from '@react-google-maps/api';
 import MapWithClouds from './MapWithClouds.jsx';
@@ -189,7 +189,7 @@ function App() {
     };
 
     // This function is called when the "Occupy" button is clicked
-    const handleClaimCell = () => {
+    const handleClaimCell = useCallback(() => {
         if (!selectedCell) return;
         const {key} = selectedCell;
 
@@ -203,14 +203,14 @@ function App() {
         } else {
             setIsModalOpen(true);
         }
-    };
+    }, [selectedCell, clouds]);
 
-    const handleRegister = () => {
+    const handleRegister = useCallback(() => {
         setClouds(10);
         setIsModalOpen(false);
-    };
+    }, []);
 
-    const handleReturnToGlobe = () => {
+    const handleReturnToGlobe = useCallback(() => {
         if (!mapRef.current) return;
 
         const currentCenter = mapRef.current.getCenter();
@@ -231,9 +231,9 @@ function App() {
                 navigate('/', {state: {lat, lng}});
             }
         }, 50); // Adjust interval for animation speed
-    };
+    }, [navigate]);
 
-    const handleCompassClick = async () => {
+    const handleCompassClick = useCallback(async () => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
@@ -259,27 +259,27 @@ function App() {
         } else {
             alert("您的瀏覽器不支援地理位置功能。");
         }
-    };
+    }, []);
 
-    const handleZoomChanged = (newZoom) => {
+    const handleZoomChanged = useCallback((newZoom) => {
         setZoom(newZoom);
-    };
+    }, []);
 
-    const handleZoomIn = () => {
+    const handleZoomIn = useCallback(() => {
         if (mapRef.current) {
             mapRef.current.setZoom(mapRef.current.getZoom() + 1);
         }
-    };
+    }, []);
 
-    const handleZoomOut = () => {
+    const handleZoomOut = useCallback(() => {
         if (mapRef.current) {
             mapRef.current.setZoom(mapRef.current.getZoom() - 1);
         }
-    };
+    }, []);
 
-    const handleInfoClick = () => {
+    const handleInfoClick = useCallback(() => {
         setIsInfoModalOpen(true);
-    };
+    }, []);
 
     if (!isLoaded || !center) {
         return <div>地圖載入中...</div>;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 const counterStyle = {
   backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -25,4 +25,4 @@ function CloudCounter({ count }) {
   );
 }
 
-export default CloudCounter;
+export default memo(CloudCounter);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 
 const baseStyle = {
   width: '48px',
@@ -39,4 +39,4 @@ function Compass({ onClick }) {
   );
 }
 
-export default Compass;
+export default memo(Compass);

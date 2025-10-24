@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { playClickSound } from './audioPlayer.js'; // Import the shared sound player
 
 const styles = {
@@ -108,4 +108,4 @@ const CellInfoWindow = ({ cellInfo, onClaim }) => {
   );
 };
 
-export default CellInfoWindow;
+export default memo(CellInfoWindow);
