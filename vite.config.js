@@ -10,7 +10,7 @@ export default defineConfig(({ command }) => {
     }
   } else {
     return {
-      base: '/chill-demo/', // For local development
+      base: '/chill-demo', // For local development
       plugins: [react()],
     }
   }

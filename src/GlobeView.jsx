@@ -55,35 +55,28 @@ const GlobeView = () => {
             }
 
             globeEl.current.controls().autoRotateSpeed = 0.1;
-            globeEl.current.controls().minDistance = 150;
+            globeEl.current.controls().minDistance = 1;
             globeEl.current.controls().maxDistance = 250;
         }
     }, [location]);
 
-    const transitionToMap = (coords) => {
+    const handleGlobeClick = ({ lat, lng }) => {
         if (!globeEl.current || isTransitioning) return;
-        const panDuration = 1500;
-        const zoomDuration = 1500;
-        const fadeStartDelay = 1000;
-        const finalNavDelay = panDuration + zoomDuration + 200;
 
+        const transitionDuration = 2000; // 2 seconds
+
+        // 1. Animate the globe to fly into the clicked point
         globeEl.current.controls().autoRotate = false;
-        globeEl.current.pointOfView({ lat: coords.lat, lng: coords.lng, altitude: 1.5 }, panDuration);
+        globeEl.current.pointOfView({ lat, lng, altitude: 0.05 }, transitionDuration);
 
+        // 2. Set a timeout to navigate exactly when the animation finishes
         setTimeout(() => {
-            globeEl.current.pointOfView({ lat: coords.lat, lng: coords.lng, altitude: 0.01 }, zoomDuration);
+            setIsTransitioning(true); // Trigger fade-out CSS effect
+            // A small delay for the fade-out to start before navigating
             setTimeout(() => {
-                setIsTransitioning(true);
-            }, fadeStartDelay);
-        }, panDuration);
-
-        setTimeout(() => {
-            navigate(`/map/${coords.lat}/${coords.lng}`);
-        }, finalNavDelay);
-    };
-
-    const handlePolygonClick = (polygon, event, { lat, lng }) => {
-        transitionToMap({ lat, lng });
+                navigate(`/map/${lat}/${lng}`);
+            }, 300);
+        }, transitionDuration);
     };
 
     const htmlElementsData = useMemo(() => {
@@ -116,12 +109,13 @@ const GlobeView = () => {
             <Globe
                 ref={globeEl}
                 globeImageUrl={earthImage}
+                onGlobeClick={handleGlobeClick}
                 polygonsData={countriesData.features}
                 polygonCapColor={p => p === hoveredPolygon ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.2)'}
                 polygonSideColor={() => 'rgba(0, 0, 0, 0.1)'}
                 polygonStrokeColor={p => p === hoveredPolygon ? '#fff' : 'rgba(0, 0, 0, 0.1)'}
                 onPolygonHover={setHoveredPolygon}
-                onPolygonClick={handlePolygonClick}
+                onPolygonClick={(polygon, event, { lat, lng }) => handleGlobeClick({ lat, lng })}
                 polygonsTransitionDuration={300}
                 polygonResolution={3}
                 polygonAltitude={0.005}
@@ -135,7 +129,10 @@ const GlobeView = () => {
                         el.style.width = '20px';
                         el.style.cursor = 'pointer';
                         el.style.pointerEvents = 'auto';
-                        el.onclick = () => transitionToMap({ lat: d.lat, lng: d.lng });
+                        el.onclick = (e) => {
+                            e.stopPropagation(); // Prevent globe click from firing
+                            handleGlobeClick({ lat: d.lat, lng: d.lng });
+                        };
                         return el;
                     }
 
@@ -145,7 +142,10 @@ const GlobeView = () => {
                     markerEl.title = d.name;
                     markerEl.style.cursor = 'pointer';
                     markerEl.style.pointerEvents = 'auto';
-                    markerEl.onclick = () => transitionToMap({ lat: d.lat, lng: d.lng });
+                    markerEl.onclick = (e) => {
+                        e.stopPropagation(); // Prevent globe click from firing
+                        handleGlobeClick({ lat: d.lat, lng: d.lng });
+                    };
 
                     const flagImg = document.createElement('img');
                     flagImg.src = `https://flagcdn.com/w20/${d.iso2.toLowerCase()}.png`;
