@@ -1,0 +1,142 @@
+[
+  {
+    "name": "Buenos Aires",
+    "country": "Argentina",
+    "iso2": "AR",
+    "lat": -34.6037,
+    "lng": -58.3816
+  },
+  {
+    "name": "Dhaka",
+    "country": "Bangladesh",
+    "iso2": "BD",
+    "lat": 23.8103,
+    "lng": 90.4125
+  },
+  {
+    "name": "Santiago",
+    "country": "Chile",
+    "iso2": "CL",
+    "lat": -33.4489,
+    "lng": -70.6693
+  },
+  {
+    "name": "Beijing",
+    "country": "China",
+    "iso2": "CN",
+    "lat": 39.9042,
+    "lng": 116.4074
+  },
+  {
+    "name": "Bogota",
+    "country": "Colombia",
+    "iso2": "CO",
+    "lat": 4.711,
+    "lng": -74.0721
+  },
+  {
+    "name": "Berlin",
+    "country": "Germany",
+    "iso2": "DE",
+    "lat": 52.52,
+    "lng": 13.405
+  },
+  {
+    "name": "Cairo",
+    "country": "Egypt",
+    "iso2": "EG",
+    "lat": 30.0444,
+    "lng": 31.2357
+  },
+  {
+    "name": "Madrid",
+    "country": "Spain",
+    "iso2": "ES",
+    "lat": 40.4168,
+    "lng": -3.7038
+  },
+  {
+    "name": "Paris",
+    "country": "France",
+    "iso2": "FR",
+    "lat": 48.8566,
+    "lng": 2.3522
+  },
+  {
+    "name": "London",
+    "country": "United Kingdom",
+    "iso2": "GB",
+    "lat": 51.5074,
+    "lng": -0.1278
+  },
+  {
+    "name": "Jakarta",
+    "country": "Indonesia",
+    "iso2": "ID",
+    "lat": -6.2088,
+    "lng": 106.8456
+  },
+  {
+    "name": "Delhi",
+    "country": "India",
+    "iso2": "IN",
+    "lat": 28.7041,
+    "lng": 77.1025
+  },
+  {
+    "name": "Tehran",
+    "country": "Iran",
+    "iso2": "IR",
+    "lat": 35.6892,
+    "lng": 51.389
+  },
+  {
+    "name": "Rome",
+    "country": "Italy",
+    "iso2": "IT",
+    "lat": 41.9028,
+    "lng": 12.4964
+  },
+  {
+    "name": "Tokyo",
+    "country": "Japan",
+    "iso2": "JP",
+    "lat": 35.6895,
+    "lng": 139.6917
+  },
+  {
+    "name": "Mexico City",
+    "country": "Mexico",
+    "iso2": "MX",
+    "lat": 19.4326,
+    "lng": -99.1332
+  },
+  {
+    "name": "Lima",
+    "country": "Peru",
+    "iso2": "PE",
+    "lat": -12.0464,
+    "lng": -77.0428
+  },
+  {
+    "name": "Manila",
+    "country": "Philippines",
+    "iso2": "PH",
+    "lat": 14.5995,
+    "lng": 120.9842
+  },
+  {
+    "name": "Singapore",
+    "country": "Singapore",
+    "iso2": "SG",
+    "lat": 1.3521,
+    "lng": 103.8198
+  },
+  {
+    "name": "Bangkok",
+    "country": "Thailand",
+    "iso2": "TH",
+    "lat": 13.7563,
+    "lng": 100.5018
+  }
+]

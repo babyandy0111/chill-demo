@@ -1,2 +1,41 @@
-/* The styles from this file have been removed as they conflicted with the Tailwind CSS layout. 
-   All styling is now handled by utility classes and the global src/index.css file. */
+/* Keyframe animation for the waving flag */
+@keyframes wave-animation {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  50% { transform: rotate(10deg); }
+  75% { transform: rotate(-10deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Main container for the flag and pole */
+.flag-marker {
+  width: 22px;
+  height: 28px; /* Set a consistent height */
+  cursor: pointer;
+  pointer-events: auto;
+  position: relative;
+  /* Centering the marker relative to the globe coordinate */
+  transform: translate(-1px, -100%);
+}
+
+/* The flagpole */
+.flag-marker .flag-pole {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  height: 100%; /* Pole takes the full height of the container */
+  background-color: #8B4513; /* SaddleBrown, a classic flagpole color */
+}
+
+/* The flag image */
+.flag-marker img {
+  position: absolute;
+  top: 0;
+  left: 2px; /* Position it just to the right of the pole */
+  width: 20px;
+  height: 15px; /* Give the flag a specific height */
+  transform-origin: 0 50%; /* Pivot from the left edge */
+  animation: wave-animation 2.5s infinite;
+  border: 1px solid #ccc; /* Optional: adds a little definition */
+}

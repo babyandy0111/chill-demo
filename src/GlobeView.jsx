@@ -4,7 +4,7 @@ import Globe from 'react-globe.gl';
 import { geoCentroid } from 'd3-geo';
 import countriesData from './assets/countries.json';
 import earthImage from './assets/earth-8k.jpg';
-import citiesData from './assets/world_cities.json'; // Import city data
+import capitalsData from './assets/capitals.json'; // Import the new capitals data
 
 // Create a reverse map from the feature object itself to its properties for reliable lookup
 const featureMap = new Map(
@@ -14,14 +14,15 @@ const featureMap = new Map(
 const GlobeView = () => {
     const globeEl = useRef();
     const [hoveredPolygon, setHoveredPolygon] = useState(null);
+    // No need for a separate capitals state, we can use the imported data directly
     const navigate = useNavigate();
 
     useEffect(() => {
         if (globeEl.current) {
             globeEl.current.controls().autoRotate = true;
-            globeEl.current.controls().autoRotateSpeed = 0.15;
+            globeEl.current.controls().autoRotateSpeed = 0.1;
             globeEl.current.controls().minDistance = 150;
-            globeEl.current.controls().maxDistance = 500;
+            globeEl.current.controls().maxDistance = 250;
         }
     }, []);
 
@@ -29,23 +30,40 @@ const GlobeView = () => {
         navigate(`/map/${lat}/${lng}`);
     };
 
-    // Generate flag data only for the hovered country using the reliable feature map
-    const flagData = useMemo(() => {
-        if (!hoveredPolygon) return [];
+    // Memoize the combined data for HTML elements (hover flag + capital flags)
+    const htmlElementsData = useMemo(() => {
+        // Data for hovered country flag
+        const hoverFlag = (() => {
+            if (!hoveredPolygon) return null;
+            const properties = featureMap.get(hoveredPolygon);
+            if (!properties) return null;
+            const centroid = geoCentroid(hoveredPolygon);
+            const iso2 = properties.iso_a2;
+            return {
+                lat: centroid[1],
+                lng: centroid[0],
+                iso2: iso2,
+                name: properties.name,
+                isHover: true, // Differentiator
+            };
+        })();
 
-        const properties = featureMap.get(hoveredPolygon); // Look up the correct properties
-        if (!properties) return [];
+        // Data for capital city flags from our new file
+        const capitalFlags = capitalsData.map(city => ({
+            lat: city.lat,
+            lng: city.lng,
+            iso2: city.iso2,
+            name: `${city.name}, ${city.country}`,
+            isHover: false, // Differentiator
+        }));
 
-        const centroid = geoCentroid(hoveredPolygon);
-        const iso2 = properties.iso_a2; // Use lowercase 'iso_a2'
+        return [
+            ...capitalFlags,
+            ...(hoverFlag ? [hoverFlag] : []) // Add hover flag if it exists
+        ].filter(d => d.iso2 && d.iso2 !== '-99');
 
-        return [{
-            iso2: iso2,
-            name: properties.name, // Use lowercase 'name'
-            lat: centroid[1],
-            lng: centroid[0],
-        }];
     }, [hoveredPolygon]);
+
 
     return (
         <Globe
@@ -63,29 +81,37 @@ const GlobeView = () => {
             polygonResolution={3}
             polygonAltitude={0.005}
 
-            // Labels (Cities)
-            labelsData={citiesData}
-            labelLat={d => d.lat}
-            labelLng={d => d.lng}
-            labelText={d => d.name}
-            labelSize={d => Math.sqrt(d.pop) * 4e-4}
-            labelDotRadius={d => Math.sqrt(d.pop) * 4e-4}
-            labelColor={() => 'rgba(255, 165, 0, 0.75)'}
-            labelResolution={2}
-            onLabelClick={d => navigate(`/map/${d.lat}/${d.lng}`)}
-            labelAltitude={0.01}
-
-            // HTML Elements (Flags on hover)
-            htmlElementsData={flagData.filter(d => d.iso2 && d.iso2 !== '-99')}
+            // HTML Elements (Flags)
+            htmlElementsData={htmlElementsData}
             htmlElement={d => {
-                const el = document.createElement('img');
-                el.src = `https://flagcdn.com/w20/${d.iso2.toLowerCase()}.png`;
-                el.title = d.name; // Show country name on hover
-                el.style.width = '20px';
-                el.style.cursor = 'pointer';
-                el.style.pointerEvents = 'auto'; // Allow mouse events
-                el.onclick = () => navigate(`/map/${d.lat}/${d.lng}`);
-                return el;
+                // For the hover flag, keep it as a simple image without the pole/animation
+                if (d.isHover) {
+                    const el = document.createElement('img');
+                    el.src = `https://flagcdn.com/w20/${d.iso2.toLowerCase()}.png`;
+                    el.title = d.name;
+                    el.style.width = '20px';
+                    el.style.cursor = 'pointer';
+                    el.style.pointerEvents = 'auto';
+                    el.onclick = () => navigate(`/map/${d.lat}/${d.lng}`);
+                    return el;
+                }
+
+                // For capital cities, create the full marker with a pole
+                const markerEl = document.createElement('div');
+                markerEl.className = 'flag-marker';
+                markerEl.title = d.name;
+                markerEl.onclick = () => navigate(`/map/${d.lat}/${d.lng}`);
+
+                const flagImg = document.createElement('img');
+                flagImg.src = `https://flagcdn.com/w20/${d.iso2.toLowerCase()}.png`;
+
+                const poleEl = document.createElement('div');
+                poleEl.className = 'flag-pole';
+
+                markerEl.appendChild(flagImg);
+                markerEl.appendChild(poleEl);
+
+                return markerEl;
             }}
         />
     );
