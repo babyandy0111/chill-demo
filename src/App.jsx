@@ -88,6 +88,9 @@ const smoothAnimate = (map, targetCenter, duration, targetZoom = null) => {
     });
 };
 
+const geocodeCache = new Map();
+const CACHE_GRID_SIZE = 0.5; // Define a larger grid for caching (approx. 55km)
+
 function App() {
 
     const {lat, lng} = useParams();
@@ -137,22 +140,28 @@ function App() {
 
     // This function is now async to handle the geocoding API call.
     const handleSelectCell = async (key, position) => {
-        // Close window if clicking away or on a claimed cell.
         if (!key || (selectedCell && selectedCell.key === key) || claimedCells[key]) {
             setSelectedCell(null);
             return;
         }
 
-        // Play sound on new cell selection
         playClickSound();
 
-        // Immediately show the window in a loading state.
-        setSelectedCell({key, position, isLoading: true});
+        const cacheKey = `${Math.floor(position.lat / CACHE_GRID_SIZE)}_${Math.floor(position.lng / CACHE_GRID_SIZE)}`;
+
+        if (geocodeCache.has(cacheKey)) {
+            const cachedData = geocodeCache.get(cacheKey);
+            setSelectedCell({ ...cachedData, key, position, isLoading: false });
+            return;
+        }
+
+        setSelectedCell({ key, position, isLoading: true });
 
         try {
             const geocoder = new window.google.maps.Geocoder();
-            const response = await geocoder.geocode({location: position});
+            const response = await geocoder.geocode({ location: position });
 
+            let regionData;
             if (response.results && response.results[0]) {
                 const address = response.results[0].address_components;
                 const country = address.find(c => c.types.includes('country'));
@@ -161,31 +170,21 @@ function App() {
                 const countryName = country ? country.long_name : '未知水域';
                 const countryCode = country ? country.short_name.toLowerCase() : null;
                 const regionName = region ? region.long_name : '';
-
                 const flagUrl = countryCode ? `https://flagcdn.com/w40/${countryCode}.png` : null;
 
-                // Update the state with the fetched information.
-                setSelectedCell({key, position, isLoading: false, countryName, regionName, flagUrl});
+                regionData = { countryName, regionName, flagUrl };
             } else {
-                setSelectedCell({
-                    key,
-                    position,
-                    isLoading: false,
-                    countryName: '無法取得地點資訊',
-                    regionName: '',
-                    flagUrl: null
-                });
+                regionData = { countryName: '無法取得地點資訊', regionName: '', flagUrl: null };
             }
+            
+            geocodeCache.set(cacheKey, regionData);
+            setSelectedCell({ ...regionData, key, position, isLoading: false });
+
         } catch (error) {
             console.error("Geocoding failed:", error);
-            setSelectedCell({
-                key,
-                position,
-                isLoading: false,
-                countryName: '地理資訊查詢失敗',
-                regionName: '',
-                flagUrl: null
-            });
+            const errorData = { countryName: '地理資訊查詢失敗', regionName: '', flagUrl: null };
+            geocodeCache.set(cacheKey, errorData);
+            setSelectedCell({ ...errorData, key, position, isLoading: false });
         }
     };
 
