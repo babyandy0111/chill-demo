@@ -138,6 +138,10 @@ function App() {
     const [userLocation, setUserLocation] = useState(null); // State for the user's location marker
     const mapRef = useRef(null);
 
+    const setMapRef = useCallback((map) => {
+        mapRef.current = map;
+    }, []);
+
     // This function is now async to handle the geocoding API call.
     const handleSelectCell = async (key, position) => {
         if (!key || (selectedCell && selectedCell.key === key) || claimedCells[key]) {
@@ -281,6 +285,10 @@ function App() {
         setIsInfoModalOpen(true);
     }, []);
 
+    const handleCloseRegistrationModal = useCallback(() => setIsModalOpen(false), []);
+    const handleCloseLeaderboard = useCallback(() => setIsLeaderboardOpen(false), []);
+    const handleCloseInfoModal = useCallback(() => setIsInfoModalOpen(false), []);
+
     if (!isLoaded || !center) {
         return <div>地圖載入中...</div>;
     }
@@ -291,9 +299,7 @@ function App() {
                 center={center} // Pass the center to the map
                 onSelectCell={handleSelectCell}
                 claimedCells={claimedCells}
-                setMapRef={(map) => {
-                    mapRef.current = map;
-                }}
+                setMapRef={setMapRef}
                 onZoomChanged={handleZoomChanged}
                 selectedCell={selectedCell}
                 onClaim={handleClaimCell}
@@ -328,15 +334,15 @@ function App() {
             </div>
 
             {isModalOpen && (
-                <RegistrationModal onClose={() => setIsModalOpen(false)} onRegister={handleRegister}/>
+                <RegistrationModal onClose={handleCloseRegistrationModal} onRegister={handleRegister}/>
             )}
 
             {isLeaderboardOpen && (
-                <Leaderboard onClose={() => setIsLeaderboardOpen(false)}/>
+                <Leaderboard onClose={handleCloseLeaderboard}/>
             )}
 
             {isInfoModalOpen && (
-                <InfoModal onClose={() => setIsInfoModalOpen(false)}/>
+                <InfoModal onClose={handleCloseInfoModal}/>
             )}
         </div>
     );
