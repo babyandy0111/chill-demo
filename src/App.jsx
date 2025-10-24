@@ -50,9 +50,10 @@ const styles = {
         position: 'absolute',
         top: '16px',
         right: '16px',
+        zIndex: 50,
+        display: 'flex',
         flexDirection: 'column',
         gap: '8px',
-        zIndex: 50,
     },
     bottomRightContainer: {
         position: 'absolute',
