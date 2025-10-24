@@ -243,11 +243,16 @@ function App() {
                     setUserLocation(location);
 
                     if (mapRef.current) {
-                        const currentZoom = mapRef.current.getZoom();
-                        await smoothAnimate(mapRef.current, location, 1500);
-                        if (currentZoom < 15) {
-                            await smoothAnimate(mapRef.current, location, 2000, 15);
-                        }
+                        const map = mapRef.current;
+                        const currentCenter = map.getCenter();
+                        const currentCenterLiteral = { lat: currentCenter.lat(), lng: currentCenter.lng() };
+
+                        // 1. Zoom out to a "cruising altitude"
+                        await smoothAnimate(map, currentCenterLiteral, 1000, 5);
+                        // 2. Pan to the new location at cruising altitude
+                        await smoothAnimate(map, location, 1500, 5);
+                        // 3. Zoom in to the final destination
+                        await smoothAnimate(map, location, 1000, 15);
                     }
                 },
                 () => alert("無法取得您的位置資訊。"),
