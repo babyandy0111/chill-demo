@@ -4,6 +4,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden; /* Prevent scrollbars on the main view */
+  background-color: #1a1a1a; /* Match the loading screen for seamless transitions */
 }
 
 #root {
