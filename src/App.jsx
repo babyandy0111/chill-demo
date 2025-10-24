@@ -50,6 +50,8 @@ const styles = {
         position: 'absolute',
         top: '16px',
         right: '16px',
+        flexDirection: 'column',
+        gap: '8px',
         zIndex: 50,
     },
     bottomRightContainer: {
@@ -199,6 +201,10 @@ function App() {
         setIsModalOpen(false);
     };
 
+    const handleReturnToGlobe = () => {
+        console.log("Returning to globe");
+    }
+
     const handleCompassClick = async () => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -286,6 +292,7 @@ function App() {
 
             <div style={styles.topRightContainer}>
                 <button style={styles.controlButton} onClick={() => setIsLeaderboardOpen(true)}>🏆</button>
+                <button style={styles.controlButton} onClick={handleReturnToGlobe} title="Return to Globe">🌍</button>
             </div>
 
             <div style={styles.bottomRightContainer}>
