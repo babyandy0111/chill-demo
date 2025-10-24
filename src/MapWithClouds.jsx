@@ -81,7 +81,7 @@ const MapWithClouds = ({ center, onSelectCell, claimedCells, setMapRef, onZoomCh
     if (zoom < 15) {
       onSelectCell(null, null);
       return;
-    };
+    }
 
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();

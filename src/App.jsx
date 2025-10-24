@@ -96,11 +96,10 @@ function App() {
 
     const [center, setCenter] = useState(null);
 
-    const [isReturning, setIsReturning] = useState(false);
+    const [setIsReturning] = useState(false);
 
 
-
-    const { isLoaded } = useJsApiLoader({
+    const {isLoaded} = useJsApiLoader({
 
         id: 'google-map-script',
 
@@ -130,7 +129,7 @@ function App() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-    const [zoom, setZoom] = useState(10);
+    const [setZoom] = useState(10);
     const [claimedCells, setClaimedCells] = useState({});
     const [selectedCell, setSelectedCell] = useState(null);
     const [userLocation, setUserLocation] = useState(null); // State for the user's location marker
