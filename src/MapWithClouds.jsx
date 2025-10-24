@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { GoogleMap } from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 import CellInfoWindow from "./CellInfoWindow.jsx";
@@ -20,14 +20,41 @@ const mapStyles = [
 
 const MapWithClouds = ({ center, onSelectCell, claimedCells, setMapRef, onZoomChanged, selectedCell, onClaim, userLocation }) => {
   const [hoveredCell, setHoveredCell] = useState(null);
-  const [zoom, setZoom] = useState(12);
+  const [zoom, setZoom] = useState(3); // Start with a zoomed-out view
   const [mapInstance, setMapInstance] = useState(null);
 
   const handleMapLoad = useCallback((map) => {
     setMapInstance(map);
     setMapRef(map);
-    setZoom(map.getZoom());
   }, [setMapRef]);
+
+  // Effect for the cinematic "fly-to" animation
+  useEffect(() => {
+    if (mapInstance) {
+      // Start the animation shortly after the component fades in
+      const flyToTimeout = setTimeout(() => {
+        mapInstance.panTo(center);
+
+        // Gradually zoom in after panning starts
+        let currentZoom = mapInstance.getZoom();
+        const targetZoom = 15;
+        const zoomInterval = setInterval(() => {
+          if (currentZoom < targetZoom) {
+            currentZoom++;
+            mapInstance.setZoom(currentZoom);
+          } else {
+            clearInterval(zoomInterval);
+            // Manually trigger idle once animation is complete to update state
+            handleIdle();
+          }
+        }, 150); // Adjust interval for zoom speed
+      }, 500); // 500ms delay after map load
+
+      return () => {
+        clearTimeout(flyToTimeout);
+      };
+    }
+  }, [mapInstance, center]);
 
   const handleIdle = () => {
     if (mapInstance) {
@@ -72,11 +99,11 @@ const MapWithClouds = ({ center, onSelectCell, claimedCells, setMapRef, onZoomCh
   };
 
   return (
-    <div style={mapRootStyle}>
+    <div className="view-container fade-in" style={mapRootStyle}>
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={center}
-        zoom={12}
+        zoom={3} // Initial zoom is low
         options={{
           disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: false,
           tilt: 0, mapTypeId: 'roadmap',
