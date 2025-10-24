@@ -1,6 +1,6 @@
 import React, {useState, useRef, useEffect} from 'react';
-import {useParams} from 'react-router-dom';
-import { useJsApiLoader } from '@react-google-maps/api';
+import {useParams, useNavigate} from 'react-router-dom';
+import {useJsApiLoader} from '@react-google-maps/api';
 import MapWithClouds from './MapWithClouds.jsx';
 import CloudCounter from './CloudCounter.jsx';
 import Leaderboard from './Leaderboard.jsx';
@@ -89,11 +89,21 @@ const smoothAnimate = (map, targetCenter, duration, targetZoom = null) => {
 };
 
 function App() {
+
     const {lat, lng} = useParams();
+
+    const navigate = useNavigate();
+
     const [center, setCenter] = useState(null);
 
+    const [isReturning, setIsReturning] = useState(false);
+
+
+
     const { isLoaded } = useJsApiLoader({
+
         id: 'google-map-script',
+
         googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     });
 
@@ -203,8 +213,27 @@ function App() {
     };
 
     const handleReturnToGlobe = () => {
-        console.log("Returning to globe");
-    }
+        if (!mapRef.current) return;
+
+        const currentCenter = mapRef.current.getCenter();
+        const lat = currentCenter.lat();
+        const lng = currentCenter.lng();
+
+        setIsReturning(true); // Trigger the zoom-out-fade animation
+
+        // Animate the zoom out
+        let currentZoom = mapRef.current.getZoom();
+        const zoomOutInterval = setInterval(() => {
+            if (currentZoom > 2) {
+                currentZoom -= 0.5; // Zoom out in steps
+                mapRef.current.setZoom(currentZoom);
+            } else {
+                clearInterval(zoomOutInterval);
+                // After animation, navigate with state
+                navigate('/', {state: {lat, lng}});
+            }
+        }, 50); // Adjust interval for animation speed
+    };
 
     const handleCompassClick = async () => {
         if (navigator.geolocation) {
