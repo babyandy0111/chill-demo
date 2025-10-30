@@ -1,25 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import cloudImageSrc from '../assets/cloud.png';
 
-// --- Inject CSS Keyframes for the claim animation ---
-const keyframes = `
-  @keyframes chill-claim {
-    0% {
-      transform: scale(0.5);
-      opacity: 0;
-    }
-    100% {
-      transform: scale(1);
-      opacity: 1;
-    }
-  }
-`;
-const styleSheet = document.createElement("style");
-styleSheet.type = "text/css";
-styleSheet.innerText = keyframes;
-document.head.appendChild(styleSheet);
-
-
 const GRID_SIZE = 0.0005;
 const cloudImage = new Image();
 cloudImage.src = cloudImageSrc;
@@ -52,12 +33,8 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
     const claimedCellsRef = useRef(claimedCells);
     const exploredCellsRef = useRef(exploredCells);
     const noisePatternRef = useRef(null);
-    const animatedCells = useRef(new Set()); // Track cells that have been animated
 
     useEffect(() => {
-        // When claimedCells changes, check for new cells to animate
-        const newCells = Object.keys(claimedCells).filter(key => !claimedCellsRef.current[key]);
-        newCells.forEach(key => animatedCells.current.add(key));
         claimedCellsRef.current = claimedCells;
     }, [claimedCells]);
 
@@ -94,7 +71,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 this.nePixel = null;
                 this.drawableClaimed = [];
                 this.drawableExplored = [];
-                this.cloudElements = new Map(); // Store references to cloud elements for animation
 
                 this.fogCanvas = document.createElement('canvas');
                 this.fogCtx = this.fogCanvas.getContext('2d');
@@ -102,9 +78,10 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 this.fogCanvas.style.pointerEvents = 'none';
                 this.fogCanvas.style.transition = 'opacity 0.3s ease-in-out'; // Smooth transition for opacity
 
-                this.cloudsContainer = document.createElement('div'); // Use a div container for clouds
-                this.cloudsContainer.style.position = 'absolute';
-                this.cloudsContainer.style.pointerEvents = 'none';
+                this.cloudsCanvas = document.createElement('canvas');
+                this.cloudsCtx = this.cloudsCanvas.getContext('2d');
+                this.cloudsCanvas.style.position = 'absolute';
+                this.cloudsCanvas.style.pointerEvents = 'none';
 
                 this.dynamicCanvas = document.createElement('canvas');
                 this.dynamicCtx = this.dynamicCanvas.getContext('2d');
@@ -126,12 +103,12 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
             onAdd() {
                 const panes = this.getPanes();
                 panes.overlayLayer.appendChild(this.fogCanvas);
-                panes.overlayMouseTarget.appendChild(this.cloudsContainer);
+                panes.overlayMouseTarget.appendChild(this.cloudsCanvas);
                 panes.overlayMouseTarget.appendChild(this.dynamicCanvas);
             }
 
             onRemove() {
-                [this.fogCanvas, this.cloudsContainer, this.dynamicCanvas].forEach(canvas => {
+                [this.fogCanvas, this.cloudsCanvas, this.dynamicCanvas].forEach(canvas => {
                     if (canvas.parentElement) {
                         canvas.parentElement.removeChild(canvas);
                     }
@@ -142,7 +119,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const projection = this.getProjection();
                 if (!projection) return;
 
-                const OVERSCAN_FACTOR = 0.5;
+                const OVERSCAN_FACTOR = 0.5; // 50% overscan on each side
 
                 const bounds = this.getMap().getBounds();
                 const sw = bounds.getSouthWest();
@@ -161,23 +138,17 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const canvasWidth = width + 2 * overscanWidth;
                 const canvasHeight = height + 2 * overscanHeight;
 
+                // Adjust swPixel and nePixel to be the top-left of our larger drawing area
                 this.swPixel = { x: swPixelOriginal.x - overscanWidth, y: swPixelOriginal.y + overscanHeight };
                 this.nePixel = { x: nePixelOriginal.x + overscanWidth, y: nePixelOriginal.y - overscanHeight };
 
-                this.fogCanvas.style.left = `${swPixelOriginal.x - overscanWidth}px`;
-                this.fogCanvas.style.top = `${nePixelOriginal.y - overscanHeight}px`;
-                this.fogCanvas.width = canvasWidth;
-                this.fogCanvas.height = canvasHeight;
 
-                this.cloudsContainer.style.left = `${swPixelOriginal.x - overscanWidth}px`;
-                this.cloudsContainer.style.top = `${nePixelOriginal.y - overscanHeight}px`;
-                this.cloudsContainer.style.width = `${canvasWidth}px`;
-                this.cloudsContainer.style.height = `${canvasHeight}px`;
-
-                this.dynamicCanvas.style.left = `${swPixelOriginal.x - overscanWidth}px`;
-                this.dynamicCanvas.style.top = `${nePixelOriginal.y - overscanHeight}px`;
-                this.dynamicCanvas.width = canvasWidth;
-                this.dynamicCanvas.height = canvasHeight;
+                [this.fogCanvas, this.cloudsCanvas, this.dynamicCanvas].forEach(canvas => {
+                    canvas.style.left = `${swPixelOriginal.x - overscanWidth}px`;
+                    canvas.style.top = `${nePixelOriginal.y - overscanHeight}px`;
+                    canvas.width = canvasWidth;
+                    canvas.height = canvasHeight;
+                });
 
                 this.drawFog();
                 this.drawClouds();
@@ -189,16 +160,21 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 if (!projection || !this.swPixel) return;
 
                 this.fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+
+                // Dynamically adjust opacity based on animation status
                 this.fogCanvas.style.opacity = this.props.isAnimating ? '0.7' : '1';
 
+                // 1. Fill with solid dark color
                 this.fogCtx.fillStyle = 'rgba(26, 26, 26, 0.9)';
                 this.fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
 
+                // 2. Add noise texture
                 if (noisePatternRef.current) {
                     this.fogCtx.fillStyle = noisePatternRef.current;
                     this.fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
                 }
                 
+                // 3. Use destination-out to "erase" fog with soft circles
                 this.fogCtx.globalCompositeOperation = 'destination-out';
 
                 this.drawableExplored.forEach(cell => {
@@ -217,7 +193,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
 
                     const centerX = rectX + rectWidth / 2;
                     const centerY = rectY + rectHeight / 2;
-                    const radiusX = rectWidth * 1.5;
+                    const radiusX = rectWidth * 1.5; // Make radius larger than the cell
                     const radiusY = rectHeight * 1.5;
 
                     const gradient = this.fogCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(radiusX, radiusY));
@@ -231,6 +207,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                     this.fogCtx.fill();
                 });
 
+                // 4. Reset composite operation
                 this.fogCtx.globalCompositeOperation = 'source-over';
             }
 
@@ -238,40 +215,19 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const projection = this.getProjection();
                 if (!projection || !cloudImage.complete || !this.swPixel) return;
 
-                const currentKeys = new Set();
+                this.cloudsCtx.clearRect(0, 0, this.cloudsCanvas.width, this.cloudsCanvas.height);
+
                 this.drawableClaimed.forEach(cell => {
-                    const key = `${cell.south}_${cell.west}`;
-                    currentKeys.add(key);
-
-                    let img = this.cloudElements.get(key);
-                    if (!img) {
-                        img = cloudImage.cloneNode();
-                        img.style.position = 'absolute';
-                        this.cloudElements.set(key, img);
-                        this.cloudsContainer.appendChild(img);
-                    }
-
-                    const pixelSW = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(cell.south, cell.west));
-                    const pixelNE = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(cell.south + GRID_SIZE, cell.west + GRID_SIZE));
+                    const { south, west } = cell;
+                    const pixelSW = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south, west));
+                    const pixelNE = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE));
                     if (!pixelSW || !pixelNE) return;
-
-                    img.style.left = `${pixelSW.x - this.swPixel.x}px`;
-                    img.style.top = `${pixelNE.y - this.nePixel.y}px`;
-                    img.style.width = `${pixelNE.x - pixelSW.x}px`;
-                    img.style.height = `${pixelSW.y - pixelNE.y}px`;
-
-                    if (animatedCells.current.has(key)) {
-                        img.style.animation = `chill-claim 1s ease-out forwards`;
-                        animatedCells.current.delete(key); // Animate only once
-                    }
-                });
-
-                // Garbage collect old cloud elements
-                this.cloudElements.forEach((img, key) => {
-                    if (!currentKeys.has(key)) {
-                        img.remove();
-                        this.cloudElements.delete(key);
-                    }
+                    this.cloudsCtx.drawImage(cloudImage,
+                        pixelSW.x - this.swPixel.x,
+                        pixelNE.y - this.nePixel.y,
+                        pixelNE.x - pixelSW.x,
+                        pixelSW.y - pixelNE.y
+                    );
                 });
             }
 
