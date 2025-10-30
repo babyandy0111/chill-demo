@@ -27,14 +27,13 @@ const MapWithClouds = ({
                            onZoomChanged,
                            onCenterChanged,
                            selectedCell,
-                           onClaim,
                            userLocation
                        }) => {
     const [hoveredCell, setHoveredCell] = useState(null);
     const [zoom, setZoom] = useState(15);
     const [mapInstance, setMapInstance] = useState(null);
     const throttleTimeout = useRef(null);
-    const hasAnimatedRef = useRef(false); // Ref to track if initial animation has run
+    const hasAnimatedRef = useRef(false);
 
     const handleMapLoad = useCallback((map) => {
         setMapInstance(map);
@@ -52,14 +51,13 @@ const MapWithClouds = ({
     }, [mapInstance, onZoomChanged, onCenterChanged]);
 
     useEffect(() => {
-        if (mapInstance && !hasAnimatedRef.current) {
-            hasAnimatedRef.current = true; // Set the flag to true
-            
-            mapInstance.setZoom(3); // Start zoomed out
-            mapInstance.panTo(center);
+        if (mapInstance && center && !hasAnimatedRef.current) {
+            hasAnimatedRef.current = true;
 
+            // The map is already centered correctly via props.
+            // We just need to handle the zoom animation.
             const flyToTimeout = setTimeout(() => {
-                let currentZoom = 3;
+                let currentZoom = 3; // Start from the initial zoom
                 const targetZoom = 15;
                 const zoomInterval = setInterval(() => {
                     if (currentZoom < targetZoom) {
@@ -70,7 +68,7 @@ const MapWithClouds = ({
                         handleIdle(); // Update state after animation is complete
                     }
                 }, 150);
-            }, 500);
+            }, 500); // A short delay to allow map tiles to load
 
             return () => {
                 clearTimeout(flyToTimeout);
@@ -143,7 +141,6 @@ const MapWithClouds = ({
                 {selectedCell && (
                     <CellInfoWindow
                         cellInfo={selectedCell}
-                        onClaim={onClaim}
                     />
                 )}
                 {userLocation && (

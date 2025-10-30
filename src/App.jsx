@@ -99,11 +99,19 @@ const CACHE_GRID_SIZE = 0.5; // Define a larger grid for caching (approx. 55km)
 function App() {
     const { lat, lng } = useParams();
     const navigate = useNavigate();
-    const [center, setCenter] = useState(null);
+    
+    // Initialize center synchronously from URL params to avoid race conditions.
+    const [center, setCenter] = useState(() => {
+        if (lat && lng) {
+            return { lat: parseFloat(lat), lng: parseFloat(lng) };
+        }
+        return null; // Will be set by useEffect if null
+    });
+
     const [isReturning, setIsReturning] = useState(false);
     const mapRef = useRef(null);
 
-    // Get state and actions from the Zustand store using individual selectors for performance
+    // ... (store hooks remain the same)
     const claimedCells = useAppStore(state => state.claimedCells);
     const exploredCells = useAppStore(state => state.exploredCells);
     const selectedCell = useAppStore(state => state.selectedCell);
@@ -119,29 +127,31 @@ function App() {
         googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     });
 
-    // Effect for initializing geolocation from the store
+    // Effect for initializing geolocation from the store (runs once)
     useEffect(() => {
         initializeGeolocation();
     }, [initializeGeolocation]);
 
+    // This effect now ONLY handles the fallback case for setting the center.
     useEffect(() => {
-        if (lat && lng) {
-            setCenter({ lat: parseFloat(lat), lng: parseFloat(lng) });
-        } else {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setCenter({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude,
-                    });
-                },
-                () => {
-                    // Fallback to Taipei if geolocation fails
-                    setCenter({ lat: 25.033, lng: 121.5654 });
-                }
-            );
+        // If center is already set (from URL), do nothing.
+        if (center) {
+            return;
         }
-    }, [lat, lng]);
+        // Otherwise, get user's location or set a default.
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setCenter({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                });
+            },
+            () => {
+                // Fallback to Taipei if geolocation fails
+                setCenter({ lat: 25.033, lng: 121.5654 });
+            }
+        );
+    }, [center]); // Dependency ensures it runs only when center is null initially.
 
     // Local UI state for modals
     const [isModalOpen, setIsModalOpen] = useState(false);
