@@ -64,15 +64,29 @@ const GlobeView = () => {
     useEffect(() => {
         if (globeEl.current) {
             const { state } = location;
+            const transitionDuration = 2000; // 2 seconds for a smooth flight
+
             if (state && state.lat && state.lng) {
-                // Coming back from map, point to the location
-                globeEl.current.pointOfView({ lat: state.lat, lng: state.lng, altitude: 1.5 });
+                // Case 1: Coming back from map view. Point to the last location.
+                globeEl.current.pointOfView({ lat: state.lat, lng: state.lng, altitude: 1.5 }, transitionDuration);
                 globeEl.current.controls().autoRotate = false;
             } else {
-                // Initial load
-                globeEl.current.controls().autoRotate = true;
+                // Case 2: Initial load. Ask for GPS.
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        // Success: User granted permission.
+                        const { latitude, longitude } = position.coords;
+                        globeEl.current.pointOfView({ lat: latitude, lng: longitude, altitude: 1.5 }, transitionDuration);
+                        globeEl.current.controls().autoRotate = false;
+                    },
+                    () => {
+                        // Failure: User denied or error occurred. Fallback to auto-rotation.
+                        globeEl.current.controls().autoRotate = true;
+                    }
+                );
             }
 
+            // Common settings
             globeEl.current.controls().autoRotateSpeed = 0.1;
             globeEl.current.controls().minDistance = 1;
             globeEl.current.controls().maxDistance = 250;
