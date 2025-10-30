@@ -4,7 +4,7 @@ import Globe from 'react-globe.gl';
 import { geoCentroid } from 'd3-geo';
 import * as THREE from 'three';
 import countriesData from './assets/countries.json';
-import earthImage from './assets/earth-8k.jpg';
+import earthImage from './assets/earth-8k.webp';
 import capitalsData from './assets/capitals.json';
 import Leaderboard from './Leaderboard.jsx';
 import cloudsTexture from './assets/clouds.png';
