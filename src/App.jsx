@@ -150,6 +150,10 @@ function App() {
         }
     }, [claimSelectedCell]);
 
+    const handleCloseInfoWindow = useCallback(() => {
+        selectCell(null);
+    }, [selectCell]);
+
     const handleRegister = useCallback(() => {
         register();
         setIsModalOpen(false);
@@ -238,14 +242,15 @@ function App() {
                 onCenterChanged={handleCenterChanged}
                 selectedCell={selectedCell}
                 userLocation={userLocation}
-                onZoomOutLimit={handleZoomOutLimit} // Pass the handler down
-                isAnimating={isAnimating} // Pass isAnimating to MapWithClouds
+                onZoomOutLimit={handleZoomOutLimit}
+                isAnimating={isAnimating}
             />
 
             {selectedCell && (
                 <CellInfoWindow
                     cellInfo={selectedCell}
                     onClaim={handleClaimCell}
+                    onClose={handleCloseInfoWindow}
                 />
             )}
 
