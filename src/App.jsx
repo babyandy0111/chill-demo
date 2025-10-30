@@ -165,9 +165,9 @@ function App() {
 
                 const newExplored = {};
                 let changed = false;
-                // Explore a 3x3 grid around the user
-                for (let i = -1; i <= 1; i++) {
-                    for (let j = -1; j <= 1; j++) {
+                // Explore a 1x1 grid around the user
+                for (let i = 0; i <= 0; i++) {
+                    for (let j = 0; j <= 0; j++) {
                         const key = `${iy + i}_${ix + j}`;
                         if (!exploredCellsRef.current[key]) {
                             newExplored[key] = true;
@@ -307,6 +307,11 @@ function App() {
         setZoom(newZoom);
     }, []);
 
+    const handleCenterChanged = useCallback((newCenter) => {
+        // Update URL without adding to history
+        navigate(`/map/${newCenter.lat.toFixed(4)}/${newCenter.lng.toFixed(4)}`, { replace: true });
+    }, [navigate]);
+
     const handleZoomIn = useCallback(() => {
         if (mapRef.current) {
             mapRef.current.setZoom(mapRef.current.getZoom() + 1);
@@ -340,6 +345,7 @@ function App() {
                 exploredCells={exploredCells}
                 setMapRef={setMapRef}
                 onZoomChanged={handleZoomChanged}
+                onCenterChanged={handleCenterChanged}
                 selectedCell={selectedCell}
                 onClaim={handleClaimCell}
                 userLocation={userLocation} // Pass the user location state down

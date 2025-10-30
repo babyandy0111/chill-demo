@@ -1,17 +1,38 @@
-import {useEffect, useRef, useState} from 'react';
+import { useEffect, useRef, useState } from 'react';
 import cloudImageSrc from './assets/cloud.png';
 
 const GRID_SIZE = 0.0005;
 const cloudImage = new Image();
 cloudImage.src = cloudImageSrc;
 
-const CanvasOverlay = ({map, zoom, claimedCells, exploredCells, hoveredCell}) => {
+// --- Helper function to create a noise pattern ---
+const createNoisePattern = () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const size = 100;
+    canvas.width = size;
+    canvas.height = size;
+    const imageData = ctx.createImageData(size, size);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+        const value = Math.random() * 100;
+        data[i] = value;
+        data[i + 1] = value;
+        data[i + 2] = value;
+        data[i + 3] = 5; // Low alpha for subtlety
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return ctx.createPattern(canvas, 'repeat');
+};
+
+const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) => {
     const overlayRef = useRef(null);
     const workerRef = useRef(null);
     const [drawableClaimedCells, setDrawableClaimedCells] = useState([]);
     const [drawableExploredCells, setDrawableExploredCells] = useState([]);
     const claimedCellsRef = useRef(claimedCells);
     const exploredCellsRef = useRef(exploredCells);
+    const noisePatternRef = useRef(null);
 
     useEffect(() => {
         claimedCellsRef.current = claimedCells;
@@ -22,11 +43,13 @@ const CanvasOverlay = ({map, zoom, claimedCells, exploredCells, hoveredCell}) =>
     }, [exploredCells]);
 
     useEffect(() => {
-        const worker = new Worker(new URL('./grid.worker.js', import.meta.url), {type: 'module'});
+        noisePatternRef.current = createNoisePattern(); // Create pattern once
+
+        const worker = new Worker(new URL('./grid.worker.js', import.meta.url), { type: 'module' });
         workerRef.current = worker;
 
         worker.onmessage = (e) => {
-            const {claimedCellsToDraw, exploredCellsToDraw} = e.data;
+            const { claimedCellsToDraw, exploredCellsToDraw } = e.data;
             setDrawableClaimedCells(claimedCellsToDraw);
             setDrawableExploredCells(exploredCellsToDraw);
         };
@@ -68,7 +91,7 @@ const CanvasOverlay = ({map, zoom, claimedCells, exploredCells, hoveredCell}) =>
             }
 
             setProps(props) {
-                this.props = {...this.props, ...props};
+                this.props = { ...this.props, ...props };
             }
 
             setDrawableCells(claimed, explored) {
@@ -124,40 +147,68 @@ const CanvasOverlay = ({map, zoom, claimedCells, exploredCells, hoveredCell}) =>
             drawFog() {
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
-                const {zoom} = this.props;
+                const { zoom } = this.props;
 
                 this.fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
                 if (zoom < 15) return;
 
-                this.fogCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                // 1. Fill with solid dark color
+                this.fogCtx.fillStyle = 'rgba(26, 26, 26, 0.7)';
                 this.fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+
+                // 2. Add noise texture
+                if (noisePatternRef.current) {
+                    this.fogCtx.fillStyle = noisePatternRef.current;
+                    this.fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+                }
+                
+                // 3. Use destination-out to "erase" fog with soft circles
                 this.fogCtx.globalCompositeOperation = 'destination-out';
 
                 this.drawableExplored.forEach(cell => {
-                    const {south, west} = cell;
-                    const pixelSW = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south, west));
-                    const pixelNE = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE));
+                    const { south, west } = cell;
+                    const cellSW = new window.google.maps.LatLng(south, west);
+                    const cellNE = new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE);
+                    const pixelSW = projection.fromLatLngToDivPixel(cellSW);
+                    const pixelNE = projection.fromLatLngToDivPixel(cellNE);
+
                     if (!pixelSW || !pixelNE) return;
-                    this.fogCtx.fillRect(
-                        pixelSW.x - this.swPixel.x,
-                        pixelNE.y - this.nePixel.y,
-                        pixelNE.x - pixelSW.x,
-                        pixelSW.y - pixelNE.y
-                    );
+
+                    const rectX = pixelSW.x - this.swPixel.x;
+                    const rectY = pixelNE.y - this.nePixel.y;
+                    const rectWidth = pixelNE.x - pixelSW.x;
+                    const rectHeight = pixelSW.y - pixelNE.y;
+
+                    const centerX = rectX + rectWidth / 2;
+                    const centerY = rectY + rectHeight / 2;
+                    const radiusX = rectWidth * 1.5; // Make radius larger than the cell
+                    const radiusY = rectHeight * 1.5;
+
+                    const gradient = this.fogCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(radiusX, radiusY));
+                    gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+                    gradient.addColorStop(0.7, 'rgba(0, 0, 0, 1)');
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+                    this.fogCtx.fillStyle = gradient;
+                    this.fogCtx.beginPath();
+                    this.fogCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+                    this.fogCtx.fill();
                 });
+
+                // 4. Reset composite operation
                 this.fogCtx.globalCompositeOperation = 'source-over';
             }
 
             drawClouds() {
                 const projection = this.getProjection();
                 if (!projection || !cloudImage.complete || !this.swPixel) return;
-                const {zoom} = this.props;
+                const { zoom } = this.props;
 
                 this.cloudsCtx.clearRect(0, 0, this.cloudsCanvas.width, this.cloudsCanvas.height);
                 if (zoom < 15) return;
 
                 this.drawableClaimed.forEach(cell => {
-                    const {south, west} = cell;
+                    const { south, west } = cell;
                     const pixelSW = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south, west));
                     const pixelNE = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE));
                     if (!pixelSW || !pixelNE) return;
@@ -174,7 +225,7 @@ const CanvasOverlay = ({map, zoom, claimedCells, exploredCells, hoveredCell}) =>
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
 
-                const {zoom, hoveredCell} = this.props;
+                const { zoom, hoveredCell } = this.props;
                 this.dynamicCtx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
 
                 if (zoom < 15 || !hoveredCell) return;
@@ -209,8 +260,8 @@ const CanvasOverlay = ({map, zoom, claimedCells, exploredCells, hoveredCell}) =>
                 if (bounds) {
                     workerRef.current.postMessage({
                         bounds: {
-                            southwest: {lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng()},
-                            northeast: {lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng()}
+                            southwest: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() },
+                            northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
                         },
                         zoom: map.getZoom(),
                         claimedCells: claimedCellsRef.current,
@@ -230,7 +281,7 @@ const CanvasOverlay = ({map, zoom, claimedCells, exploredCells, hoveredCell}) =>
 
     useEffect(() => {
         if (!overlayRef.current) return;
-        overlayRef.current.setProps({zoom, hoveredCell});
+        overlayRef.current.setProps({ zoom, hoveredCell });
         overlayRef.current.drawDynamic();
     }, [zoom, hoveredCell]);
 
@@ -247,8 +298,8 @@ const CanvasOverlay = ({map, zoom, claimedCells, exploredCells, hoveredCell}) =>
         if (bounds) {
             workerRef.current.postMessage({
                 bounds: {
-                    southwest: {lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng()},
-                    northeast: {lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng()}
+                    southwest: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() },
+                    northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
                 },
                 zoom: map.getZoom(),
                 claimedCells: claimedCells,

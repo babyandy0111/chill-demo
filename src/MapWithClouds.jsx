@@ -25,6 +25,7 @@ const MapWithClouds = ({
                            exploredCells,
                            setMapRef,
                            onZoomChanged,
+                           onCenterChanged,
                            selectedCell,
                            onClaim,
                            userLocation
@@ -42,10 +43,12 @@ const MapWithClouds = ({
     const handleIdle = useCallback(() => {
         if (mapInstance) {
             const newZoom = mapInstance.getZoom();
+            const newCenter = mapInstance.getCenter();
             onZoomChanged(newZoom);
+            onCenterChanged({ lat: newCenter.lat(), lng: newCenter.lng() });
             setZoom(newZoom);
         }
-    }, [mapInstance, onZoomChanged]);
+    }, [mapInstance, onZoomChanged, onCenterChanged]);
 
     useEffect(() => {
         if (mapInstance) {
