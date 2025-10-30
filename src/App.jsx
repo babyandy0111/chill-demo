@@ -1,14 +1,16 @@
-import React, {useState, useRef, useEffect, useCallback} from 'react';
+import React, {useState, useRef, useEffect, useCallback, lazy, Suspense} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
 import {useJsApiLoader} from '@react-google-maps/api';
 import MapWithClouds from './MapWithClouds.jsx';
 import CloudCounter from './CloudCounter.jsx';
-import Leaderboard from './Leaderboard.jsx';
 import Compass from './Compass.jsx';
-import RegistrationModal from './RegistrationModal.jsx';
-import InfoModal from './InfoModal.jsx';
 import CellInfoWindow from './CellInfoWindow.jsx'; // Import the new component
 import {playClickSound} from './audioPlayer.js';
+import LoadingScreen from './LoadingScreen.jsx';
+
+const Leaderboard = lazy(() => import('./Leaderboard.jsx'));
+const RegistrationModal = lazy(() => import('./RegistrationModal.jsx'));
+const InfoModal = lazy(() => import('./InfoModal.jsx'));
 
 const GRID_SIZE = 0.0005;
 
@@ -381,17 +383,19 @@ function App() {
                 <Compass onClick={handleCompassClick}/>
             </div>
 
-            {isModalOpen && (
-                <RegistrationModal onClose={handleCloseRegistrationModal} onRegister={handleRegister}/>
-            )}
+            <Suspense fallback={<LoadingScreen />}>
+                {isModalOpen && (
+                    <RegistrationModal onClose={handleCloseRegistrationModal} onRegister={handleRegister}/>
+                )}
 
-            {isLeaderboardOpen && (
-                <Leaderboard onClose={handleCloseLeaderboard}/>
-            )}
+                {isLeaderboardOpen && (
+                    <Leaderboard onClose={handleCloseLeaderboard}/>
+                )}
 
-            {isInfoModalOpen && (
-                <InfoModal onClose={handleCloseInfoModal}/>
-            )}
+                {isInfoModalOpen && (
+                    <InfoModal onClose={handleCloseInfoModal}/>
+                )}
+            </Suspense>
         </div>
     );
 }
