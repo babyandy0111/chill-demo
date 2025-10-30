@@ -1,5 +1,7 @@
-export const smoothAnimate = (map, targetCenter, duration, targetZoom = null) => {
+export const smoothAnimate = (map, targetCenter, duration, targetZoom = null, setIsAnimating = null) => {
     return new Promise((resolve) => {
+        if (setIsAnimating) setIsAnimating(true); // Animation starts
+
         const startCenter = map.getCenter();
         const startZoom = map.getZoom();
         const startTime = Date.now();
@@ -16,6 +18,7 @@ export const smoothAnimate = (map, targetCenter, duration, targetZoom = null) =>
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
+                if (setIsAnimating) setIsAnimating(false); // Animation ends
                 resolve();
             }
         };

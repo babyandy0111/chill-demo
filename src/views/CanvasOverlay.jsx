@@ -25,7 +25,7 @@ const createNoisePattern = () => {
     return ctx.createPattern(canvas, 'repeat');
 };
 
-const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) => {
+const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, isAnimating }) => {
     const overlayRef = useRef(null);
     const workerRef = useRef(null);
     const [drawableClaimedCells, setDrawableClaimedCells] = useState([]);
@@ -159,6 +159,9 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) 
                 if (!projection || !this.swPixel) return;
 
                 this.fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+
+                // Dynamically adjust opacity based on animation status
+                this.fogCanvas.style.opacity = this.props.isAnimating ? '0.7' : '1';
 
                 // 1. Fill with solid dark color
                 this.fogCtx.fillStyle = 'rgba(26, 26, 26, 0.9)';
@@ -306,9 +309,10 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) 
 
     useEffect(() => {
         if (!overlayRef.current) return;
-        overlayRef.current.setProps({ zoom, hoveredCell });
+        overlayRef.current.setProps({ zoom, hoveredCell, isAnimating });
         overlayRef.current.drawDynamic();
-    }, [zoom, hoveredCell]);
+        overlayRef.current.drawFog();
+    }, [zoom, hoveredCell, isAnimating]);
 
     useEffect(() => {
         if (!overlayRef.current) return;

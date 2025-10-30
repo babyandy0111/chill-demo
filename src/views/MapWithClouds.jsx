@@ -38,6 +38,7 @@ const MapWithClouds = ({
     const hasAnimatedRef = useRef(false);
     const wheelThrottleTimeout = useRef(null);
     const WHEEL_THROTTLE_MS = 150; // Throttle wheel events
+    const [isAnimating, setIsAnimating] = useState(false); // New state for animation status
 
     const handleMapLoad = useCallback((map) => {
         setMapInstance(map);
@@ -64,12 +65,12 @@ const MapWithClouds = ({
         const runAnimation = async () => {
             if (mapInstance && center && !hasAnimatedRef.current) {
                 hasAnimatedRef.current = true;
-                await smoothAnimate(mapInstance, center, 2000, 15);
+                await smoothAnimate(mapInstance, center, 2000, 15, setIsAnimating); // Pass setIsAnimating
                 handleIdle();
             }
         };
         runAnimation();
-    }, [mapInstance, center, handleIdle]);
+    }, [mapInstance, center, handleIdle, setIsAnimating]);
 
     const handleMouseMove = useCallback((e) => {
         if (throttleTimeout.current) {
@@ -124,10 +125,10 @@ const MapWithClouds = ({
             const clampedTargetZoom = Math.max(5, Math.min(20, targetZoom));
 
             if (clampedTargetZoom !== currentZoom) {
-                await smoothAnimate(mapInstance, mapInstance.getCenter().toJSON(), 300, clampedTargetZoom);
+                await smoothAnimate(mapInstance, mapInstance.getCenter().toJSON(), 300, clampedTargetZoom, setIsAnimating); // Pass setIsAnimating
             }
         }, WHEEL_THROTTLE_MS);
-    }, [mapInstance]);
+    }, [mapInstance, setIsAnimating]);
 
     return (
         <div className="view-container fade-in" style={mapRootStyle} onWheel={handleWheel}>
@@ -155,6 +156,7 @@ const MapWithClouds = ({
                     claimedCells={claimedCells}
                     exploredCells={exploredCells}
                     hoveredCell={hoveredCell}
+                    isAnimating={isAnimating} // Pass isAnimating to CanvasOverlay
                 />
                 {selectedCell && (
                     <CellInfoWindow
@@ -168,3 +170,5 @@ const MapWithClouds = ({
         </div>
     );
 };
+
+export default React.memo(MapWithClouds);

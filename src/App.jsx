@@ -132,6 +132,7 @@ function App() {
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [zoom, setZoom] = useState(10);
+    const [isAnimating, setIsAnimating] = useState(false); // New state for animation status
 
     const setMapRef = useCallback((map) => {
         mapRef.current = map;
@@ -160,9 +161,9 @@ function App() {
         const lat = currentCenter.lat();
         const lng = currentCenter.lng();
         setIsReturning(true);
-        await smoothAnimate(mapRef.current, { lat, lng }, 1500, 2);
+        await smoothAnimate(mapRef.current, { lat, lng }, 1500, 2, setIsAnimating); // Pass setIsAnimating
         navigate('/', { state: { lat, lng } });
-    }, [navigate]);
+    }, [navigate, setIsAnimating]);
 
     const handleZoomOutLimit = useCallback(() => {
         if (window.confirm("您已縮放到最小級別，要返回地球儀嗎？")) {
@@ -180,13 +181,13 @@ function App() {
             const map = mapRef.current;
             const currentCenter = map.getCenter();
             const currentCenterLiteral = { lat: currentCenter.lat(), lng: currentCenter.lng() };
-            await smoothAnimate(map, currentCenterLiteral, 1000, 5);
-            await smoothAnimate(map, userLocation, 1500, 5);
-            await smoothAnimate(map, userLocation, 1000, 15);
+            await smoothAnimate(map, currentCenterLiteral, 1000, 5, setIsAnimating); // Pass setIsAnimating
+            await smoothAnimate(map, userLocation, 1500, 5, setIsAnimating); // Pass setIsAnimating
+            await smoothAnimate(map, userLocation, 1000, 15, setIsAnimating); // Pass setIsAnimating
         } else {
             alert("無法取得您的位置資訊。請確認已授權瀏覽器存取您的位置。");
         }
-    }, [userLocation]);
+    }, [userLocation, setIsAnimating]);
 
     const handleZoomChanged = useCallback((newZoom) => {
         setZoom(newZoom);
@@ -201,20 +202,20 @@ function App() {
             const currentZoom = mapRef.current.getZoom();
             const targetZoom = Math.min(20, currentZoom + 1); // Clamp to maxZoom
             if (targetZoom !== currentZoom) {
-                await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom);
+                await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom, setIsAnimating); // Pass setIsAnimating
             }
         }
-    }, []);
+    }, [setIsAnimating]);
 
     const handleZoomOut = useCallback(async () => {
         if (mapRef.current) {
             const currentZoom = mapRef.current.getZoom();
             const targetZoom = Math.max(5, currentZoom - 1); // Clamp to minZoom
             if (targetZoom !== currentZoom) {
-                await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom);
+                await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom, setIsAnimating); // Pass setIsAnimating
             }
         }
-    }, []);
+    }, [setIsAnimating]);
 
     const handleInfoClick = useCallback(() => setIsInfoModalOpen(true), []);
     const handleCloseRegistrationModal = useCallback(() => setIsModalOpen(false), []);
@@ -238,6 +239,7 @@ function App() {
                 selectedCell={selectedCell}
                 userLocation={userLocation}
                 onZoomOutLimit={handleZoomOutLimit} // Pass the handler down
+                isAnimating={isAnimating} // Pass isAnimating to MapWithClouds
             />
 
             {selectedCell && (
