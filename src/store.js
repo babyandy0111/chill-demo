@@ -12,17 +12,19 @@ export const useAppStore = create(
         exploredCells: {},
         selectedCell: null,
         userLocation: null,
-        isHydrated: false, // New state to track if store has loaded from DB
+        isHydrated: false,
+        lastCloudIncrease: Date.now(), // Track the timestamp of the last cloud increase
 
         // --- ACTIONS ---
 
         // Hydrate the store from IndexedDB
         hydrate: async () => {
             try {
-                const [exploredCellsArray, claimedCellsArray, cloudsState] = await Promise.all([
+                const [exploredCellsArray, claimedCellsArray, cloudsState, lastIncreaseState] = await Promise.all([
                     db.exploredCells.toArray(),
                     db.claimedCells.toArray(),
                     db.gameState.get('clouds'),
+                    db.gameState.get('lastCloudIncrease'),
                 ]);
 
                 const exploredCells = {};
@@ -32,21 +34,35 @@ export const useAppStore = create(
 
                 const claimedCells = {};
                 claimedCellsArray.forEach(cell => {
-                    claimedCells[cell.id] = cell.data; // Assuming 'data' holds {owner, color}
+                    claimedCells[cell.id] = cell.data;
                 });
 
                 set((state) => {
                     state.exploredCells = exploredCells;
                     state.claimedCells = claimedCells;
-                    state.clouds = cloudsState ? cloudsState.value : 10; // Default to 10 if not found
+                    state.clouds = cloudsState ? cloudsState.value : 10;
+                    state.lastCloudIncrease = lastIncreaseState ? lastIncreaseState.value : Date.now();
                     state.isHydrated = true;
                 });
             } catch (error) {
                 console.error("Failed to hydrate store from IndexedDB:", error);
-                set((state) => { state.isHydrated = true; }); // Still set hydrated to true to unblock UI
+                set((state) => { state.isHydrated = true; });
             }
         },
 
+        increaseCloud: () => {
+            const now = Date.now();
+            set((state) => {
+                if (state.clouds < 10) {
+                    state.clouds += 1;
+                    state.lastCloudIncrease = now;
+                }
+            });
+            // Save to IndexedDB
+            db.gameState.put({ key: 'clouds', value: get().clouds }).catch(e => console.error("Failed to put clouds state:", e));
+            db.gameState.put({ key: 'lastCloudIncrease', value: now }).catch(e => console.error("Failed to put lastCloudIncrease state:", e));
+        },
+        
         // Initializes geolocation tracking
         initializeGeolocation: () => {
             const watchId = navigator.geolocation.watchPosition(
@@ -76,7 +92,6 @@ export const useAppStore = create(
                         }
 
                         if (changed) {
-                            // Save to IndexedDB
                             if (cellsToAdd.length > 0) {
                                 db.exploredCells.bulkAdd(cellsToAdd).catch(e => console.error("Failed to bulkAdd explored cells:", e));
                             }
@@ -86,8 +101,6 @@ export const useAppStore = create(
                 (error) => console.error("Geolocation watch error:", error),
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
-            // We might need a way to clear this watch later if the app unmounts,
-            // but for now, we'll keep it simple.
         },
 
         // Handles selecting a cell on the map
