@@ -154,4 +154,4 @@ const MapWithClouds = ({
     );
 };
 
-export default MapWithClouds;
+export default React.memo(MapWithClouds);
