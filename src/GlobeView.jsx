@@ -2,10 +2,12 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Globe from 'react-globe.gl';
 import { geoCentroid } from 'd3-geo';
+import * as THREE from 'three';
 import countriesData from './assets/countries.json';
 import earthImage from './assets/earth-8k.jpg';
 import capitalsData from './assets/capitals.json';
 import Leaderboard from './Leaderboard.jsx';
+import cloudsTexture from './assets/clouds.png';
 
 const featureMap = new Map(
     countriesData.features.map(feature => [feature, feature.properties])
@@ -41,6 +43,23 @@ const GlobeView = () => {
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const navigate = useNavigate();
+    const [cloudLayer, setCloudLayer] = useState(null);
+
+
+    useEffect(() => {
+        // Create cloud layer
+        const globeRadius = 100; // react-globe.gl default radius
+        const cloudGeometry = new THREE.SphereGeometry(globeRadius + 1.5, 64, 64);
+        const cloudMaterial = new THREE.MeshPhongMaterial({
+            map: new THREE.TextureLoader().load(cloudsTexture),
+            transparent: true,
+            opacity: 0.6,
+        });
+        const clouds = new THREE.Mesh(cloudGeometry, cloudMaterial);
+        clouds.raycast = () => {}; // Make clouds permanently click-through
+        setCloudLayer(clouds);
+    }, []);
+
 
     useEffect(() => {
         if (globeEl.current) {
@@ -157,6 +176,14 @@ const GlobeView = () => {
                     markerEl.appendChild(poleEl);
 
                     return markerEl;
+                }}
+                customLayerData={cloudLayer ? [{}] : []}
+                customThreeObject={() => cloudLayer}
+                customThreeObjectUpdate={obj => {
+                    // Sync with globe rotation and add independent rotation
+                    if (globeEl.current) {
+                        obj.rotation.y += 0.0003;
+                    }
                 }}
             />
 
