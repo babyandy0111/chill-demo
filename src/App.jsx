@@ -10,6 +10,8 @@ import InfoModal from './InfoModal.jsx';
 import CellInfoWindow from './CellInfoWindow.jsx'; // Import the new component
 import {playClickSound} from './audioPlayer.js';
 
+const GRID_SIZE = 0.0005;
+
 const styles = {
     app: {
         position: 'relative',
@@ -136,7 +138,61 @@ function App() {
     const [claimedCells, setClaimedCells] = useState({});
     const [selectedCell, setSelectedCell] = useState(null);
     const [userLocation, setUserLocation] = useState(null); // State for the user's location marker
+    const [exploredCells, setExploredCells] = useState(() => {
+        try {
+            const saved = localStorage.getItem('exploredCells');
+            return saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            console.error("Failed to load explored cells:", e);
+            return {};
+        }
+    });
     const mapRef = useRef(null);
+    const exploredCellsRef = useRef(exploredCells);
+
+    useEffect(() => {
+        exploredCellsRef.current = exploredCells;
+    }, [exploredCells]);
+
+    useEffect(() => {
+        const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                setUserLocation({ lat: latitude, lng: longitude });
+
+                const iy = Math.floor(latitude / GRID_SIZE);
+                const ix = Math.floor(longitude / GRID_SIZE);
+
+                const newExplored = {};
+                let changed = false;
+                // Explore a 3x3 grid around the user
+                for (let i = -1; i <= 1; i++) {
+                    for (let j = -1; j <= 1; j++) {
+                        const key = `${iy + i}_${ix + j}`;
+                        if (!exploredCellsRef.current[key]) {
+                            newExplored[key] = true;
+                            changed = true;
+                        }
+                    }
+                }
+
+                if (changed) {
+                    const updatedExplored = { ...exploredCellsRef.current, ...newExplored };
+                    setExploredCells(updatedExplored);
+                    try {
+                        localStorage.setItem('exploredCells', JSON.stringify(updatedExplored));
+                    } catch (e) {
+                        console.error("Failed to save explored cells:", e);
+                    }
+                }
+            },
+            (error) => console.error("Geolocation watch error:", error),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, []);
+
 
     const setMapRef = useCallback((map) => {
         mapRef.current = map;
@@ -231,37 +287,21 @@ function App() {
     }, [navigate]);
 
     const handleCompassClick = useCallback(async () => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    const location = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude,
-                    };
+        if (userLocation && mapRef.current) {
+            const map = mapRef.current;
+            const currentCenter = map.getCenter();
+            const currentCenterLiteral = { lat: currentCenter.lat(), lng: currentCenter.lng() };
 
-                    // Set the user location to show the marker
-                    setUserLocation(location);
-
-                    if (mapRef.current) {
-                        const map = mapRef.current;
-                        const currentCenter = map.getCenter();
-                        const currentCenterLiteral = { lat: currentCenter.lat(), lng: currentCenter.lng() };
-
-                        // 1. Zoom out to a "cruising altitude"
-                        await smoothAnimate(map, currentCenterLiteral, 1000, 5);
-                        // 2. Pan to the new location at cruising altitude
-                        await smoothAnimate(map, location, 1500, 5);
-                        // 3. Zoom in to the final destination
-                        await smoothAnimate(map, location, 1000, 15);
-                    }
-                },
-                () => alert("無法取得您的位置資訊。"),
-                {enableHighAccuracy: true}
-            );
+            // 1. Zoom out to a "cruising altitude"
+            await smoothAnimate(map, currentCenterLiteral, 1000, 5);
+            // 2. Pan to the new location at cruising altitude
+            await smoothAnimate(map, userLocation, 1500, 5);
+            // 3. Zoom in to the final destination
+            await smoothAnimate(map, userLocation, 1000, 15);
         } else {
-            alert("您的瀏覽器不支援地理位置功能。");
+            alert("無法取得您的位置資訊。請確認已授權瀏覽器存取您的位置。");
         }
-    }, []);
+    }, [userLocation]);
 
     const handleZoomChanged = useCallback((newZoom) => {
         setZoom(newZoom);
@@ -297,6 +337,7 @@ function App() {
                 center={center} // Pass the center to the map
                 onSelectCell={handleSelectCell}
                 claimedCells={claimedCells}
+                exploredCells={exploredCells}
                 setMapRef={setMapRef}
                 onZoomChanged={handleZoomChanged}
                 selectedCell={selectedCell}

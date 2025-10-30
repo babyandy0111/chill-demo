@@ -1,29 +1,34 @@
-import { useEffect, useRef, useState } from 'react';
+import {useEffect, useRef, useState} from 'react';
 import cloudImageSrc from './assets/cloud.png';
 
 const GRID_SIZE = 0.0005;
 const cloudImage = new Image();
 cloudImage.src = cloudImageSrc;
 
-const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
+const CanvasOverlay = ({map, zoom, claimedCells, exploredCells, hoveredCell}) => {
     const overlayRef = useRef(null);
     const workerRef = useRef(null);
-    const [drawableCells, setDrawableCells] = useState([]);
+    const [drawableClaimedCells, setDrawableClaimedCells] = useState([]);
+    const [drawableExploredCells, setDrawableExploredCells] = useState([]);
     const claimedCellsRef = useRef(claimedCells);
+    const exploredCellsRef = useRef(exploredCells);
 
-    // This effect ensures the ref is always up-to-date
     useEffect(() => {
         claimedCellsRef.current = claimedCells;
     }, [claimedCells]);
 
-    // Setup and terminate worker
     useEffect(() => {
-        const worker = new Worker(new URL('./grid.worker.js', import.meta.url), { type: 'module' });
+        exploredCellsRef.current = exploredCells;
+    }, [exploredCells]);
+
+    useEffect(() => {
+        const worker = new Worker(new URL('./grid.worker.js', import.meta.url), {type: 'module'});
         workerRef.current = worker;
 
         worker.onmessage = (e) => {
-            const { cellsToDraw } = e.data;
-            setDrawableCells(cellsToDraw);
+            const {claimedCellsToDraw, exploredCellsToDraw} = e.data;
+            setDrawableClaimedCells(claimedCellsToDraw);
+            setDrawableExploredCells(exploredCellsToDraw);
         };
 
         return () => {
@@ -41,42 +46,49 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
                 this.props = {};
                 this.swPixel = null;
                 this.nePixel = null;
-                this.drawableCells = [];
+                this.drawableClaimed = [];
+                this.drawableExplored = [];
 
-                this.staticCanvas = document.createElement('canvas');
-                this.staticCtx = this.staticCanvas.getContext('2d');
-                this.staticCanvas.style.position = 'absolute';
-                this.staticCanvas.style.pointerEvents = 'none';
+                this.fogCanvas = document.createElement('canvas');
+                this.fogCtx = this.fogCanvas.getContext('2d');
+                this.fogCanvas.style.position = 'absolute';
+                this.fogCanvas.style.pointerEvents = 'none';
+
+                this.cloudsCanvas = document.createElement('canvas');
+                this.cloudsCtx = this.cloudsCanvas.getContext('2d');
+                this.cloudsCanvas.style.position = 'absolute';
+                this.cloudsCanvas.style.pointerEvents = 'none';
 
                 this.dynamicCanvas = document.createElement('canvas');
                 this.dynamicCtx = this.dynamicCanvas.getContext('2d');
                 this.dynamicCanvas.style.position = 'absolute';
                 this.dynamicCanvas.style.pointerEvents = 'none';
 
-                cloudImage.onload = () => this.drawStatic();
+                cloudImage.onload = () => this.drawClouds();
             }
 
             setProps(props) {
-                this.props = { ...this.props, ...props };
+                this.props = {...this.props, ...props};
             }
 
-            setDrawableCells(cells) {
-                this.drawableCells = cells;
+            setDrawableCells(claimed, explored) {
+                this.drawableClaimed = claimed;
+                this.drawableExplored = explored;
             }
 
             onAdd() {
                 const panes = this.getPanes();
-                panes.overlayMouseTarget.appendChild(this.staticCanvas);
+                panes.overlayLayer.appendChild(this.fogCanvas);
+                panes.overlayMouseTarget.appendChild(this.cloudsCanvas);
                 panes.overlayMouseTarget.appendChild(this.dynamicCanvas);
             }
 
             onRemove() {
-                if (this.staticCanvas.parentElement) {
-                    this.staticCanvas.parentElement.removeChild(this.staticCanvas);
-                }
-                if (this.dynamicCanvas.parentElement) {
-                    this.dynamicCanvas.parentElement.removeChild(this.dynamicCanvas);
-                }
+                [this.fogCanvas, this.cloudsCanvas, this.dynamicCanvas].forEach(canvas => {
+                    if (canvas.parentElement) {
+                        canvas.parentElement.removeChild(canvas);
+                    }
+                });
             }
 
             draw() {
@@ -97,44 +109,64 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
                 const canvasWidth = nePixel.x - swPixel.x;
                 const canvasHeight = swPixel.y - nePixel.y;
 
-                this.staticCanvas.style.left = `${swPixel.x}px`;
-                this.staticCanvas.style.top = `${nePixel.y}px`;
-                this.staticCanvas.width = canvasWidth;
-                this.staticCanvas.height = canvasHeight;
+                [this.fogCanvas, this.cloudsCanvas, this.dynamicCanvas].forEach(canvas => {
+                    canvas.style.left = `${swPixel.x}px`;
+                    canvas.style.top = `${nePixel.y}px`;
+                    canvas.width = canvasWidth;
+                    canvas.height = canvasHeight;
+                });
 
-                this.dynamicCanvas.style.left = `${swPixel.x}px`;
-                this.dynamicCanvas.style.top = `${nePixel.y}px`;
-                this.dynamicCanvas.width = canvasWidth;
-                this.dynamicCanvas.height = canvasHeight;
-
-                this.drawStatic();
+                this.drawFog();
+                this.drawClouds();
                 this.drawDynamic();
             }
 
-            drawStatic() {
+            drawFog() {
                 const projection = this.getProjection();
-                if (!projection || !cloudImage.complete || !this.swPixel) return;
+                if (!projection || !this.swPixel) return;
+                const {zoom} = this.props;
 
-                this.staticCtx.clearRect(0, 0, this.staticCanvas.width, this.staticCanvas.height);
-
-                const { zoom } = this.props;
+                this.fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
                 if (zoom < 15) return;
 
-                this.drawableCells.forEach(cell => {
-                    const { south, west } = cell;
-                    const cellSW = new window.google.maps.LatLng(south, west);
-                    const cellNE = new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE);
-                    const pixelSW = projection.fromLatLngToDivPixel(cellSW);
-                    const pixelNE = projection.fromLatLngToDivPixel(cellNE);
+                this.fogCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                this.fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+                this.fogCtx.globalCompositeOperation = 'destination-out';
 
+                this.drawableExplored.forEach(cell => {
+                    const {south, west} = cell;
+                    const pixelSW = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south, west));
+                    const pixelNE = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE));
                     if (!pixelSW || !pixelNE) return;
+                    this.fogCtx.fillRect(
+                        pixelSW.x - this.swPixel.x,
+                        pixelNE.y - this.nePixel.y,
+                        pixelNE.x - pixelSW.x,
+                        pixelSW.y - pixelNE.y
+                    );
+                });
+                this.fogCtx.globalCompositeOperation = 'source-over';
+            }
 
-                    const rectX = pixelSW.x - this.swPixel.x;
-                    const rectY = pixelNE.y - this.nePixel.y;
-                    const rectWidth = pixelNE.x - pixelSW.x;
-                    const rectHeight = pixelSW.y - pixelNE.y;
+            drawClouds() {
+                const projection = this.getProjection();
+                if (!projection || !cloudImage.complete || !this.swPixel) return;
+                const {zoom} = this.props;
 
-                    this.staticCtx.drawImage(cloudImage, rectX, rectY, rectWidth, rectHeight);
+                this.cloudsCtx.clearRect(0, 0, this.cloudsCanvas.width, this.cloudsCanvas.height);
+                if (zoom < 15) return;
+
+                this.drawableClaimed.forEach(cell => {
+                    const {south, west} = cell;
+                    const pixelSW = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south, west));
+                    const pixelNE = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE));
+                    if (!pixelSW || !pixelNE) return;
+                    this.cloudsCtx.drawImage(cloudImage,
+                        pixelSW.x - this.swPixel.x,
+                        pixelNE.y - this.nePixel.y,
+                        pixelNE.x - pixelSW.x,
+                        pixelSW.y - pixelNE.y
+                    );
                 });
             }
 
@@ -142,7 +174,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
 
-                const { zoom, hoveredCell } = this.props;
+                const {zoom, hoveredCell} = this.props;
                 this.dynamicCtx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
 
                 if (zoom < 15 || !hoveredCell) return;
@@ -177,11 +209,12 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
                 if (bounds) {
                     workerRef.current.postMessage({
                         bounds: {
-                            southwest: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() },
-                            northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
+                            southwest: {lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng()},
+                            northeast: {lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng()}
                         },
                         zoom: map.getZoom(),
-                        claimedCells: claimedCellsRef.current // Always use the ref here
+                        claimedCells: claimedCellsRef.current,
+                        exploredCells: exploredCellsRef.current
                     });
                 }
             }
@@ -195,35 +228,34 @@ const CanvasOverlay = ({ map, zoom, claimedCells, hoveredCell }) => {
         };
     }, [map]);
 
-    // This effect handles updates for dynamic properties like zoom and hover
     useEffect(() => {
         if (!overlayRef.current) return;
-        overlayRef.current.setProps({ zoom, hoveredCell });
+        overlayRef.current.setProps({zoom, hoveredCell});
         overlayRef.current.drawDynamic();
     }, [zoom, hoveredCell]);
 
-    // This effect redraws the static canvas when worker provides new cell data
     useEffect(() => {
         if (!overlayRef.current) return;
-        overlayRef.current.setDrawableCells(drawableCells);
-        overlayRef.current.drawStatic();
-    }, [drawableCells]);
+        overlayRef.current.setDrawableCells(drawableClaimedCells, drawableExploredCells);
+        overlayRef.current.drawFog();
+        overlayRef.current.drawClouds();
+    }, [drawableClaimedCells, drawableExploredCells]);
 
-    // This effect explicitly tells the worker to re-calculate when claimedCells change
     useEffect(() => {
         if (!map || !workerRef.current) return;
         const bounds = map.getBounds();
         if (bounds) {
             workerRef.current.postMessage({
                 bounds: {
-                    southwest: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() },
-                    northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
+                    southwest: {lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng()},
+                    northeast: {lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng()}
                 },
                 zoom: map.getZoom(),
-                claimedCells: claimedCells // Use the direct prop here is fine
+                claimedCells: claimedCells,
+                exploredCells: exploredCells
             });
         }
-    }, [claimedCells, map]);
+    }, [claimedCells, exploredCells, map]);
 
     return null;
 };

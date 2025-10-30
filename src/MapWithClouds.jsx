@@ -22,6 +22,7 @@ const MapWithClouds = ({
                            center,
                            onSelectCell,
                            claimedCells,
+                           exploredCells,
                            setMapRef,
                            onZoomChanged,
                            selectedCell,
@@ -128,6 +129,7 @@ const MapWithClouds = ({
                     map={mapInstance}
                     zoom={zoom}
                     claimedCells={claimedCells}
+                    exploredCells={exploredCells}
                     hoveredCell={hoveredCell}
                 />
                 {selectedCell && (

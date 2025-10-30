@@ -1,10 +1,10 @@
 const GRID_SIZE = 0.0005;
 
 self.onmessage = (e) => {
-    const { bounds, zoom, claimedCells } = e.data;
+    const {bounds, zoom, claimedCells, exploredCells} = e.data;
 
     if (zoom < 15) {
-        self.postMessage({ cellsToDraw: [] });
+        self.postMessage({claimedCellsToDraw: [], exploredCellsToDraw: []});
         return;
     }
 
@@ -16,18 +16,23 @@ self.onmessage = (e) => {
     const endIY = Math.floor(ne.lat / GRID_SIZE);
     const endIX = Math.floor(ne.lng / GRID_SIZE);
 
-    const cellsToDraw = [];
+    const claimedCellsToDraw = [];
+    const exploredCellsToDraw = [];
 
     for (let iy = startIY; iy <= endIY; iy++) {
         for (let ix = startIX; ix <= endIX; ix++) {
             const key = `${iy}_${ix}`;
+            const south = iy * GRID_SIZE;
+            const west = ix * GRID_SIZE;
+
+            if (exploredCells && exploredCells[key]) {
+                exploredCellsToDraw.push({south, west});
+            }
             if (claimedCells && claimedCells[key]) {
-                const south = iy * GRID_SIZE;
-                const west = ix * GRID_SIZE;
-                cellsToDraw.push({ south, west });
+                claimedCellsToDraw.push({south, west});
             }
         }
     }
 
-    self.postMessage({ cellsToDraw });
+    self.postMessage({claimedCellsToDraw, exploredCellsToDraw});
 };
