@@ -165,13 +165,16 @@ function App() {
 
                 const newExplored = {};
                 let changed = false;
-                // Explore a 1x1 grid around the user
-                for (let i = 0; i <= 0; i++) {
-                    for (let j = 0; j <= 0; j++) {
-                        const key = `${iy + i}_${ix + j}`;
-                        if (!exploredCellsRef.current[key]) {
-                            newExplored[key] = true;
-                            changed = true;
+                const EXPLORE_RADIUS = 2; // Explore a 5x5 area
+                for (let i = -EXPLORE_RADIUS; i <= EXPLORE_RADIUS; i++) {
+                    for (let j = -EXPLORE_RADIUS; j <= EXPLORE_RADIUS; j++) {
+                        // Check if the cell is within the circular radius
+                        if (i * i + j * j <= EXPLORE_RADIUS * EXPLORE_RADIUS) {
+                            const key = `${iy + i}_${ix + j}`;
+                            if (!exploredCellsRef.current[key]) {
+                                newExplored[key] = true;
+                                changed = true;
+                            }
                         }
                     }
                 }
@@ -309,7 +312,7 @@ function App() {
 
     const handleCenterChanged = useCallback((newCenter) => {
         // Update URL without adding to history
-        navigate(`/map/${newCenter.lat.toFixed(4)}/${newCenter.lng.toFixed(4)}`, { replace: true });
+        navigate(`/map/${newCenter.lat.toFixed(7)}/${newCenter.lng.toFixed(7)}`, { replace: true });
     }, [navigate]);
 
     const handleZoomIn = useCallback(() => {
