@@ -28,7 +28,8 @@ const MapWithClouds = ({
                            onZoomChanged,
                            onCenterChanged,
                            selectedCell,
-                           userLocation
+                           userLocation,
+                           onZoomOutLimit, // New prop to handle zoom out limit
                        }) => {
     const [hoveredCell, setHoveredCell] = useState(null);
     const [zoom, setZoom] = useState(15);
@@ -42,22 +43,28 @@ const MapWithClouds = ({
     }, [setMapRef]);
 
     const handleIdle = useCallback(() => {
-        if (mapInstance) {
-            const newZoom = mapInstance.getZoom();
-            const newCenter = mapInstance.getCenter();
-            onZoomChanged(newZoom);
-            onCenterChanged({ lat: newCenter.lat(), lng: newCenter.lng() });
-            setZoom(newZoom);
+        // Do not run any logic until the initial animation has completed.
+        if (!hasAnimatedRef.current || !mapInstance) return;
+
+        const newZoom = mapInstance.getZoom();
+        const newCenter = mapInstance.getCenter();
+        const minZoom = 5;
+
+        if (newZoom <= minZoom) {
+            onZoomOutLimit();
         }
-    }, [mapInstance, onZoomChanged, onCenterChanged]);
+
+        onZoomChanged(newZoom);
+        onCenterChanged({ lat: newCenter.lat(), lng: newCenter.lng() });
+        setZoom(newZoom);
+    }, [mapInstance, onZoomChanged, onCenterChanged, onZoomOutLimit]);
 
     useEffect(() => {
         const runAnimation = async () => {
             if (mapInstance && center && !hasAnimatedRef.current) {
                 hasAnimatedRef.current = true;
-                // Use the smooth animation function for the initial fly-in
                 await smoothAnimate(mapInstance, center, 2000, 15);
-                handleIdle(); // Update state after animation is complete
+                handleIdle();
             }
         };
         runAnimation();
@@ -111,6 +118,8 @@ const MapWithClouds = ({
                     disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: false,
                     tilt: 0, mapTypeId: 'roadmap',
                     styles: mapStyles,
+                    minZoom: 5, // Set the minimum zoom level
+                    maxZoom: 20, // Set the maximum zoom level
                 }}
                 onLoad={handleMapLoad}
                 onIdle={handleIdle}

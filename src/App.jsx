@@ -164,6 +164,17 @@ function App() {
         navigate('/', { state: { lat, lng } });
     }, [navigate]);
 
+    const handleZoomOutLimit = useCallback(() => {
+        if (window.confirm("您已縮放到最小級別，要返回地球儀嗎？")) {
+            handleReturnToGlobe();
+        } else {
+            // If user cancels, zoom back in a bit to avoid being stuck
+            if (mapRef.current) {
+                mapRef.current.setZoom(mapRef.current.getZoom() + 1);
+            }
+        }
+    }, [handleReturnToGlobe]);
+
     const handleCompassClick = useCallback(async () => {
         if (userLocation && mapRef.current) {
             const map = mapRef.current;
@@ -214,6 +225,7 @@ function App() {
                 onCenterChanged={handleCenterChanged}
                 selectedCell={selectedCell}
                 userLocation={userLocation}
+                onZoomOutLimit={handleZoomOutLimit} // Pass the handler down
             />
 
             {selectedCell && (
