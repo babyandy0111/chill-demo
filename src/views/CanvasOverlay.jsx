@@ -25,7 +25,7 @@ const createNoisePattern = () => {
     return ctx.createPattern(canvas, 'repeat');
 };
 
-const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, isAnimating }) => {
+const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, isAnimating, selectedCell }) => {
     const overlayRef = useRef(null);
     const workerRef = useRef(null);
     const [drawableClaimedCells, setDrawableClaimedCells] = useState([]);
@@ -235,12 +235,15 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
 
-                const { hoveredCell } = this.props;
+                const { hoveredCell, selectedCell } = this.props; // Get selectedCell from props
                 this.dynamicCtx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
 
-                if (!hoveredCell) return;
+                // Prioritize selectedCell for highlighting
+                const cellToHighlight = selectedCell ? selectedCell.key : hoveredCell;
 
-                const [iy, ix] = hoveredCell.split('_').map(Number);
+                if (!cellToHighlight) return;
+
+                const [iy, ix] = cellToHighlight.split('_').map(Number);
                 const south = iy * GRID_SIZE;
                 const west = ix * GRID_SIZE;
                 const cellSW = new window.google.maps.LatLng(south, west);
@@ -308,10 +311,10 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
 
     useEffect(() => {
         if (!overlayRef.current) return;
-        overlayRef.current.setProps({ zoom, hoveredCell, isAnimating });
+        overlayRef.current.setProps({ zoom, hoveredCell, isAnimating, selectedCell });
         overlayRef.current.drawDynamic();
         overlayRef.current.drawFog();
-    }, [zoom, hoveredCell, isAnimating]);
+    }, [zoom, hoveredCell, isAnimating, selectedCell]);
 
     useEffect(() => {
         if (!overlayRef.current) return;

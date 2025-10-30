@@ -156,7 +156,8 @@ const MapWithClouds = ({
                     claimedCells={claimedCells}
                     exploredCells={exploredCells}
                     hoveredCell={hoveredCell}
-                    isAnimating={isAnimating} // Pass isAnimating to CanvasOverlay
+                    isAnimating={isAnimating}
+                    selectedCell={selectedCell} // Pass selectedCell down
                 />
                 {selectedCell && (
                     <CellInfoWindow
