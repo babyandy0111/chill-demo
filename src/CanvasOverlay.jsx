@@ -118,23 +118,33 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) 
                 const projection = this.getProjection();
                 if (!projection) return;
 
+                const OVERSCAN_FACTOR = 0.5; // 50% overscan on each side
+
                 const bounds = this.getMap().getBounds();
                 const sw = bounds.getSouthWest();
                 const ne = bounds.getNorthEast();
-                const swPixel = projection.fromLatLngToDivPixel(sw);
-                const nePixel = projection.fromLatLngToDivPixel(ne);
+                const swPixelOriginal = projection.fromLatLngToDivPixel(sw);
+                const nePixelOriginal = projection.fromLatLngToDivPixel(ne);
 
-                if (!swPixel || !nePixel) return;
+                if (!swPixelOriginal || !nePixelOriginal) return;
 
-                this.swPixel = swPixel;
-                this.nePixel = nePixel;
+                const width = nePixelOriginal.x - swPixelOriginal.x;
+                const height = swPixelOriginal.y - nePixelOriginal.y;
 
-                const canvasWidth = nePixel.x - swPixel.x;
-                const canvasHeight = swPixel.y - nePixel.y;
+                const overscanWidth = Math.round(width * OVERSCAN_FACTOR);
+                const overscanHeight = Math.round(height * OVERSCAN_FACTOR);
+
+                const canvasWidth = width + 2 * overscanWidth;
+                const canvasHeight = height + 2 * overscanHeight;
+
+                // Adjust swPixel and nePixel to be the top-left of our larger drawing area
+                this.swPixel = { x: swPixelOriginal.x - overscanWidth, y: swPixelOriginal.y + overscanHeight };
+                this.nePixel = { x: nePixelOriginal.x + overscanWidth, y: nePixelOriginal.y - overscanHeight };
+
 
                 [this.fogCanvas, this.cloudsCanvas, this.dynamicCanvas].forEach(canvas => {
-                    canvas.style.left = `${swPixel.x}px`;
-                    canvas.style.top = `${nePixel.y}px`;
+                    canvas.style.left = `${swPixelOriginal.x - overscanWidth}px`;
+                    canvas.style.top = `${nePixelOriginal.y - overscanHeight}px`;
                     canvas.width = canvasWidth;
                     canvas.height = canvasHeight;
                 });

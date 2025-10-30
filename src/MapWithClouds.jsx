@@ -31,9 +31,10 @@ const MapWithClouds = ({
                            userLocation
                        }) => {
     const [hoveredCell, setHoveredCell] = useState(null);
-    const [zoom, setZoom] = useState(3);
+    const [zoom, setZoom] = useState(15);
     const [mapInstance, setMapInstance] = useState(null);
     const throttleTimeout = useRef(null);
+    const hasAnimatedRef = useRef(false); // Ref to track if initial animation has run
 
     const handleMapLoad = useCallback((map) => {
         setMapInstance(map);
@@ -51,10 +52,14 @@ const MapWithClouds = ({
     }, [mapInstance, onZoomChanged, onCenterChanged]);
 
     useEffect(() => {
-        if (mapInstance) {
+        if (mapInstance && !hasAnimatedRef.current) {
+            hasAnimatedRef.current = true; // Set the flag to true
+            
+            mapInstance.setZoom(3); // Start zoomed out
+            mapInstance.panTo(center);
+
             const flyToTimeout = setTimeout(() => {
-                mapInstance.panTo(center);
-                let currentZoom = mapInstance.getZoom();
+                let currentZoom = 3;
                 const targetZoom = 15;
                 const zoomInterval = setInterval(() => {
                     if (currentZoom < targetZoom) {
@@ -62,7 +67,7 @@ const MapWithClouds = ({
                         mapInstance.setZoom(currentZoom);
                     } else {
                         clearInterval(zoomInterval);
-                        handleIdle();
+                        handleIdle(); // Update state after animation is complete
                     }
                 }, 150);
             }, 500);
