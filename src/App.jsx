@@ -196,12 +196,24 @@ function App() {
         navigate(`/map/${newCenter.lat.toFixed(7)}/${newCenter.lng.toFixed(7)}`, { replace: true });
     }, [navigate]);
 
-    const handleZoomIn = useCallback(() => {
-        if (mapRef.current) mapRef.current.setZoom(mapRef.current.getZoom() + 1);
+    const handleZoomIn = useCallback(async () => {
+        if (mapRef.current) {
+            const currentZoom = mapRef.current.getZoom();
+            const targetZoom = Math.min(20, currentZoom + 1); // Clamp to maxZoom
+            if (targetZoom !== currentZoom) {
+                await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom);
+            }
+        }
     }, []);
 
-    const handleZoomOut = useCallback(() => {
-        if (mapRef.current) mapRef.current.setZoom(mapRef.current.getZoom() - 1);
+    const handleZoomOut = useCallback(async () => {
+        if (mapRef.current) {
+            const currentZoom = mapRef.current.getZoom();
+            const targetZoom = Math.max(5, currentZoom - 1); // Clamp to minZoom
+            if (targetZoom !== currentZoom) {
+                await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom);
+            }
+        }
     }, []);
 
     const handleInfoClick = useCallback(() => setIsInfoModalOpen(true), []);

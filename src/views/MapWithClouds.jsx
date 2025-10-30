@@ -29,13 +29,15 @@ const MapWithClouds = ({
                            onCenterChanged,
                            selectedCell,
                            userLocation,
-                           onZoomOutLimit, // New prop to handle zoom out limit
+                           onZoomOutLimit,
                        }) => {
     const [hoveredCell, setHoveredCell] = useState(null);
     const [zoom, setZoom] = useState(15);
     const [mapInstance, setMapInstance] = useState(null);
     const throttleTimeout = useRef(null);
     const hasAnimatedRef = useRef(false);
+    const wheelThrottleTimeout = useRef(null);
+    const WHEEL_THROTTLE_MS = 150; // Throttle wheel events
 
     const handleMapLoad = useCallback((map) => {
         setMapInstance(map);
@@ -43,7 +45,6 @@ const MapWithClouds = ({
     }, [setMapRef]);
 
     const handleIdle = useCallback(() => {
-        // Do not run any logic until the initial animation has completed.
         if (!hasAnimatedRef.current || !mapInstance) return;
 
         const newZoom = mapInstance.getZoom();
@@ -108,8 +109,28 @@ const MapWithClouds = ({
         onSelectCell(key, {lat: centerLat, lng: centerLng});
     }, [zoom, onSelectCell]);
 
+    const handleWheel = useCallback(async (e) => {
+        e.preventDefault(); // Prevent default browser scroll behavior
+        if (wheelThrottleTimeout.current) return;
+
+        wheelThrottleTimeout.current = setTimeout(async () => {
+            wheelThrottleTimeout.current = null;
+            if (!mapInstance) return;
+
+            const currentZoom = mapInstance.getZoom();
+            const targetZoom = e.deltaY < 0 ? currentZoom + 1 : currentZoom - 1;
+
+            // Clamp targetZoom to min/max allowed by GoogleMap options
+            const clampedTargetZoom = Math.max(5, Math.min(20, targetZoom));
+
+            if (clampedTargetZoom !== currentZoom) {
+                await smoothAnimate(mapInstance, mapInstance.getCenter().toJSON(), 300, clampedTargetZoom);
+            }
+        }, WHEEL_THROTTLE_MS);
+    }, [mapInstance]);
+
     return (
-        <div className="view-container fade-in" style={mapRootStyle}>
+        <div className="view-container fade-in" style={mapRootStyle} onWheel={handleWheel}>
             <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={center}
@@ -120,6 +141,7 @@ const MapWithClouds = ({
                     styles: mapStyles,
                     minZoom: 5, // Set the minimum zoom level
                     maxZoom: 20, // Set the maximum zoom level
+                    scrollwheel: false, // Disable default scrollwheel zoom
                 }}
                 onLoad={handleMapLoad}
                 onIdle={handleIdle}
@@ -146,5 +168,3 @@ const MapWithClouds = ({
         </div>
     );
 };
-
-export default React.memo(MapWithClouds);
