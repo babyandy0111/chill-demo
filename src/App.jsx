@@ -88,6 +88,7 @@ function App() {
     const exploredCells = useAppStore(state => state.exploredCells);
     const selectedCell = useAppStore(state => state.selectedCell);
     const userLocation = useAppStore(state => state.userLocation);
+    const clouds = useAppStore(state => state.clouds); // Re-add clouds state retrieval
     const initializeGeolocation = useAppStore(state => state.initializeGeolocation);
     const selectCell = useAppStore(state => state.selectCell);
     const claimSelectedCell = useAppStore(state => state.claimSelectedCell);
@@ -251,6 +252,7 @@ function App() {
                     cellInfo={selectedCell}
                     onClaim={handleClaimCell}
                     onClose={handleCloseInfoWindow}
+                    isClaimDisabled={clouds <= 0 && isModalOpen}
                 />
             )}
 
