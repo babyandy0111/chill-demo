@@ -112,22 +112,42 @@ export const useAppStore = create(
 
         // Handles claiming the currently selected cell
         claimSelectedCell: () => {
-            const { selectedCell, clouds } = get();
+            const { selectedCell, clouds, exploredCells } = get();
             if (!selectedCell) return 'no-cell';
             if (clouds <= 0) return 'no-clouds';
 
             const { key } = selectedCell;
-            const cellData = { owner: 'user', color: '#3B82F6' }; // Data to store for claimed cell
+            const cellData = { owner: 'user', color: '#3B82F6' };
+
+            // --- Expand vision logic ---
+            const [iy, ix] = key.split('_').map(Number);
+            const cellsToExplore = [];
+            const EXPLORE_RADIUS = 1; // 3x3 grid (center + 1 radius)
+
+            for (let i = -EXPLORE_RADIUS; i <= EXPLORE_RADIUS; i++) {
+                for (let j = -EXPLORE_RADIUS; j <= EXPLORE_RADIUS; j++) {
+                    const newKey = `${iy + i}_${ix + j}`;
+                    if (!exploredCells[newKey]) {
+                        cellsToExplore.push({ id: newKey });
+                    }
+                }
+            }
 
             set((state) => {
                 state.clouds -= 1;
                 state.claimedCells[key] = cellData;
+                cellsToExplore.forEach(cell => {
+                    state.exploredCells[cell.id] = true;
+                });
                 state.selectedCell = null;
             });
 
-            // Save to IndexedDB
+            // --- Save to IndexedDB ---
             db.claimedCells.put({ id: key, data: cellData }).catch(e => console.error("Failed to put claimed cell:", e));
             db.gameState.put({ key: 'clouds', value: get().clouds }).catch(e => console.error("Failed to put clouds state:", e));
+            if (cellsToExplore.length > 0) {
+                db.exploredCells.bulkAdd(cellsToExplore).catch(e => console.error("Failed to bulkAdd explored cells:", e));
+            }
 
             return 'claimed';
         },
