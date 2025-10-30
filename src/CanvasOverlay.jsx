@@ -260,7 +260,10 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) 
         overlay.setMap(map);
         overlayRef.current = overlay;
 
-        const idleListener = map.addListener('idle', () => {
+        let throttleTimeout = null;
+        const THROTTLE_MS = 100; // Update at most every 100ms
+
+        const updateGrid = () => {
             if (workerRef.current) {
                 const bounds = map.getBounds();
                 if (bounds) {
@@ -275,13 +278,29 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) 
                     });
                 }
             }
+        };
+
+        // Listener for smooth updates during pan/zoom
+        const boundsListener = map.addListener('bounds_changed', () => {
+            if (throttleTimeout) return;
+            throttleTimeout = setTimeout(() => {
+                updateGrid();
+                throttleTimeout = null;
+            }, THROTTLE_MS);
         });
+
+        // Listener for a final, perfect update when everything stops
+        const idleListener = map.addListener('idle', updateGrid);
 
         return () => {
             if (overlayRef.current) {
                 overlayRef.current.setMap(null);
             }
+            window.google.maps.event.removeListener(boundsListener);
             window.google.maps.event.removeListener(idleListener);
+            if (throttleTimeout) {
+                clearTimeout(throttleTimeout);
+            }
         };
     }, [map]);
 

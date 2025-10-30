@@ -3,6 +3,7 @@ import {GoogleMap} from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 import CellInfoWindow from "./CellInfoWindow.jsx";
 import CurrentUserLocationMarker from "./CurrentUserLocationMarker.jsx";
+import { smoothAnimate } from "./map-animation.js"; // Import the smooth animation function
 
 const GRID_SIZE = 0.0005;
 
@@ -51,29 +52,15 @@ const MapWithClouds = ({
     }, [mapInstance, onZoomChanged, onCenterChanged]);
 
     useEffect(() => {
-        if (mapInstance && center && !hasAnimatedRef.current) {
-            hasAnimatedRef.current = true;
-
-            // The map is already centered correctly via props.
-            // We just need to handle the zoom animation.
-            const flyToTimeout = setTimeout(() => {
-                let currentZoom = 3; // Start from the initial zoom
-                const targetZoom = 15;
-                const zoomInterval = setInterval(() => {
-                    if (currentZoom < targetZoom) {
-                        currentZoom++;
-                        mapInstance.setZoom(currentZoom);
-                    } else {
-                        clearInterval(zoomInterval);
-                        handleIdle(); // Update state after animation is complete
-                    }
-                }, 150);
-            }, 500); // A short delay to allow map tiles to load
-
-            return () => {
-                clearTimeout(flyToTimeout);
-            };
-        }
+        const runAnimation = async () => {
+            if (mapInstance && center && !hasAnimatedRef.current) {
+                hasAnimatedRef.current = true;
+                // Use the smooth animation function for the initial fly-in
+                await smoothAnimate(mapInstance, center, 2000, 15);
+                handleIdle(); // Update state after animation is complete
+            }
+        };
+        runAnimation();
     }, [mapInstance, center, handleIdle]);
 
     const handleMouseMove = useCallback((e) => {
@@ -119,7 +106,7 @@ const MapWithClouds = ({
             <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={center}
-                zoom={3}
+                zoom={3} // Start zoomed out
                 options={{
                     disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: false,
                     tilt: 0, mapTypeId: 'roadmap',
