@@ -1,4 +1,5 @@
-import React, { memo } from 'react';
+import React from 'react';
+import { useAppStore } from './store';
 
 const counterStyle = {
   backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -16,13 +17,15 @@ const iconStyle = {
   fontSize: '24px',
 };
 
-function CloudCounter({ count }) {
+function CloudCounter() {
+  const clouds = useAppStore((state) => state.clouds);
+
   return (
     <div style={counterStyle}>
       <span style={iconStyle}>☁️</span>
-      <span>{count}</span>
+      <span>{clouds}</span>
     </div>
   );
 }
 
-export default memo(CloudCounter);
+export default React.memo(CloudCounter);

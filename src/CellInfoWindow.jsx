@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
-import { playClickSound } from './audioPlayer.js'; // Import the shared sound player
+import { playClickSound } from './audioPlayer.js';
+import { useAppStore } from './store.js';
 
 const styles = {
   container: {
@@ -58,17 +59,18 @@ const styles = {
   }
 };
 
-const CellInfoWindow = ({ cellInfo, onClaim }) => {
+const CellInfoWindow = ({ cellInfo }) => {
+  const claimSelectedCell = useAppStore((state) => state.claimSelectedCell);
+
   if (!cellInfo) return null;
 
   const [iy, ix] = cellInfo.key.split('_');
 
   const handleClaimClick = () => {
-    // Play the sound using the shared player.
     playClickSound();
-    
-    // Call the original onClaim function passed from App.jsx.
-    onClaim();
+    // Directly call the action from the store.
+    // The App component will handle opening the modal if needed.
+    claimSelectedCell();
   };
 
   const handleMouseDown = (e) => {
@@ -93,7 +95,7 @@ const CellInfoWindow = ({ cellInfo, onClaim }) => {
               座標 (X: {ix}, Y: {iy})
             </div>
           </div>
-          <button 
+          <button
             style={styles.claimButton}
             onClick={handleClaimClick}
             onMouseDown={handleMouseDown}

@@ -4,9 +4,10 @@ import {useJsApiLoader} from '@react-google-maps/api';
 import MapWithClouds from './MapWithClouds.jsx';
 import CloudCounter from './CloudCounter.jsx';
 import Compass from './Compass.jsx';
-import CellInfoWindow from './CellInfoWindow.jsx'; // Import the new component
+import CellInfoWindow from './CellInfoWindow.jsx';
 import {playClickSound} from './audioPlayer.js';
 import LoadingScreen from './LoadingScreen.jsx';
+import { useAppStore } from './store.js'; // Import the store
 
 const Leaderboard = lazy(() => import('./Leaderboard.jsx'));
 const RegistrationModal = lazy(() => import('./RegistrationModal.jsx'));
@@ -96,26 +97,36 @@ const geocodeCache = new Map();
 const CACHE_GRID_SIZE = 0.5; // Define a larger grid for caching (approx. 55km)
 
 function App() {
-
-    const {lat, lng} = useParams();
-
+    const { lat, lng } = useParams();
     const navigate = useNavigate();
-
     const [center, setCenter] = useState(null);
-
     const [isReturning, setIsReturning] = useState(false);
+    const mapRef = useRef(null);
 
+    // Get state and actions from the Zustand store using individual selectors for performance
+    const claimedCells = useAppStore(state => state.claimedCells);
+    const exploredCells = useAppStore(state => state.exploredCells);
+    const selectedCell = useAppStore(state => state.selectedCell);
+    const userLocation = useAppStore(state => state.userLocation);
+    const initializeGeolocation = useAppStore(state => state.initializeGeolocation);
+    const selectCell = useAppStore(state => state.selectCell);
+    const updateSelectedCellInfo = useAppStore(state => state.updateSelectedCellInfo);
+    const claimSelectedCell = useAppStore(state => state.claimSelectedCell);
+    const register = useAppStore(state => state.register);
 
-    const {isLoaded} = useJsApiLoader({
-
+    const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
-
         googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     });
 
+    // Effect for initializing geolocation from the store
+    useEffect(() => {
+        initializeGeolocation();
+    }, [initializeGeolocation]);
+
     useEffect(() => {
         if (lat && lng) {
-            setCenter({lat: parseFloat(lat), lng: parseFloat(lng)});
+            setCenter({ lat: parseFloat(lat), lng: parseFloat(lng) });
         } else {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -126,168 +137,80 @@ function App() {
                 },
                 () => {
                     // Fallback to Taipei if geolocation fails
-                    setCenter({lat: 25.033, lng: 121.5654});
+                    setCenter({ lat: 25.033, lng: 121.5654 });
                 }
             );
         }
     }, [lat, lng]);
 
-    const [clouds, setClouds] = useState(10);
+    // Local UI state for modals
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-    const [zoom, setZoom] = useState(10);
-    const [claimedCells, setClaimedCells] = useState({});
-    const [selectedCell, setSelectedCell] = useState(null);
-    const [userLocation, setUserLocation] = useState(null); // State for the user's location marker
-    const [exploredCells, setExploredCells] = useState(() => {
-        try {
-            const saved = localStorage.getItem('exploredCells');
-            return saved ? JSON.parse(saved) : {};
-        } catch (e) {
-            console.error("Failed to load explored cells:", e);
-            return {};
-        }
-    });
-    const mapRef = useRef(null);
-    const exploredCellsRef = useRef(exploredCells);
-
-    useEffect(() => {
-        exploredCellsRef.current = exploredCells;
-    }, [exploredCells]);
-
-    useEffect(() => {
-        const watchId = navigator.geolocation.watchPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                setUserLocation({ lat: latitude, lng: longitude });
-
-                const iy = Math.floor(latitude / GRID_SIZE);
-                const ix = Math.floor(longitude / GRID_SIZE);
-
-                const newExplored = {};
-                let changed = false;
-                const EXPLORE_RADIUS = 2; // Explore a 5x5 area
-                for (let i = -EXPLORE_RADIUS; i <= EXPLORE_RADIUS; i++) {
-                    for (let j = -EXPLORE_RADIUS; j <= EXPLORE_RADIUS; j++) {
-                        // Check if the cell is within the circular radius
-                        if (i * i + j * j <= EXPLORE_RADIUS * EXPLORE_RADIUS) {
-                            const key = `${iy + i}_${ix + j}`;
-                            if (!exploredCellsRef.current[key]) {
-                                newExplored[key] = true;
-                                changed = true;
-                            }
-                        }
-                    }
-                }
-
-                if (changed) {
-                    const updatedExplored = { ...exploredCellsRef.current, ...newExplored };
-                    setExploredCells(updatedExplored);
-                    try {
-                        localStorage.setItem('exploredCells', JSON.stringify(updatedExplored));
-                    } catch (e) {
-                        console.error("Failed to save explored cells:", e);
-                    }
-                }
-            },
-            (error) => console.error("Geolocation watch error:", error),
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-
-        return () => navigator.geolocation.clearWatch(watchId);
-    }, []);
-
+    const [zoom, setZoom] = useState(10); // Keep zoom for now as it's used by MapWithClouds internally
 
     const setMapRef = useCallback((map) => {
         mapRef.current = map;
     }, []);
 
-    // This function is now async to handle the geocoding API call.
     const handleSelectCell = async (key, position) => {
-        if (!key || (selectedCell && selectedCell.key === key) || claimedCells[key]) {
-            setSelectedCell(null);
-            return;
-        }
-
         playClickSound();
+        // The logic to check if the cell should be selected is now in the store
+        selectCell(key ? { key, position, isLoading: true } : null);
+
+        if (!key) return; // Exit if we are deselecting
 
         const cacheKey = `${Math.floor(position.lat / CACHE_GRID_SIZE)}_${Math.floor(position.lng / CACHE_GRID_SIZE)}`;
-
         if (geocodeCache.has(cacheKey)) {
-            const cachedData = geocodeCache.get(cacheKey);
-            setSelectedCell({ ...cachedData, key, position, isLoading: false });
+            updateSelectedCellInfo(geocodeCache.get(cacheKey));
             return;
         }
-
-        setSelectedCell({ key, position, isLoading: true });
 
         try {
             const geocoder = new window.google.maps.Geocoder();
             const response = await geocoder.geocode({ location: position });
-
             let regionData;
             if (response.results && response.results[0]) {
                 const address = response.results[0].address_components;
                 const country = address.find(c => c.types.includes('country'));
                 const region = address.find(c => c.types.includes('administrative_area_level_1'));
-
                 const countryName = country ? country.long_name : '未知領域';
                 const countryCode = country ? country.short_name.toLowerCase() : null;
                 const regionName = region ? region.long_name : '';
                 const flagUrl = countryCode ? `https://flagcdn.com/w40/${countryCode}.png` : null;
-
                 regionData = { countryName, regionName, flagUrl };
             } else {
                 regionData = { countryName: '無法取得地點資訊', regionName: '', flagUrl: null };
             }
-            
             geocodeCache.set(cacheKey, regionData);
-            setSelectedCell({ ...regionData, key, position, isLoading: false });
-
+            updateSelectedCellInfo(regionData);
         } catch (error) {
             console.error("Geocoding failed:", error);
             const errorData = { countryName: '地理資訊查詢失敗', regionName: '', flagUrl: null };
             geocodeCache.set(cacheKey, errorData);
-            setSelectedCell({ ...errorData, key, position, isLoading: false });
+            updateSelectedCellInfo(errorData);
         }
     };
 
-    // This function is called when the "Occupy" button is clicked
     const handleClaimCell = useCallback(() => {
-        if (!selectedCell) return;
-        const {key} = selectedCell;
-
-        if (clouds > 0) {
-            setClouds(clouds - 1);
-            setClaimedCells(prev => ({
-                ...prev,
-                [key]: {owner: 'user', color: '#3B82F6'}
-            }));
-            setSelectedCell(null); // Hide the info window after claiming
-        } else {
+        const result = claimSelectedCell();
+        if (result === 'no-clouds') {
             setIsModalOpen(true);
         }
-    }, [selectedCell, clouds]);
+    }, [claimSelectedCell]);
 
     const handleRegister = useCallback(() => {
-        setClouds(10);
+        register();
         setIsModalOpen(false);
-    }, []);
+    }, [register]);
 
     const handleReturnToGlobe = useCallback(async () => {
         if (!mapRef.current) return;
-
         const currentCenter = mapRef.current.getCenter();
         const lat = currentCenter.lat();
         const lng = currentCenter.lng();
-
-        setIsReturning(true); // This can be used for CSS fade-out effects if needed
-
-        // Use smoothAnimate for a fluid zoom-out
+        setIsReturning(true);
         await smoothAnimate(mapRef.current, { lat, lng }, 1500, 2);
-
-        // After animation, navigate with state
         navigate('/', { state: { lat, lng } });
     }, [navigate]);
 
@@ -296,12 +219,8 @@ function App() {
             const map = mapRef.current;
             const currentCenter = map.getCenter();
             const currentCenterLiteral = { lat: currentCenter.lat(), lng: currentCenter.lng() };
-
-            // 1. Zoom out to a "cruising altitude"
             await smoothAnimate(map, currentCenterLiteral, 1000, 5);
-            // 2. Pan to the new location at cruising altitude
             await smoothAnimate(map, userLocation, 1500, 5);
-            // 3. Zoom in to the final destination
             await smoothAnimate(map, userLocation, 1000, 15);
         } else {
             alert("無法取得您的位置資訊。請確認已授權瀏覽器存取您的位置。");
@@ -313,38 +232,30 @@ function App() {
     }, []);
 
     const handleCenterChanged = useCallback((newCenter) => {
-        // Update URL without adding to history
         navigate(`/map/${newCenter.lat.toFixed(7)}/${newCenter.lng.toFixed(7)}`, { replace: true });
     }, [navigate]);
 
     const handleZoomIn = useCallback(() => {
-        if (mapRef.current) {
-            mapRef.current.setZoom(mapRef.current.getZoom() + 1);
-        }
+        if (mapRef.current) mapRef.current.setZoom(mapRef.current.getZoom() + 1);
     }, []);
 
     const handleZoomOut = useCallback(() => {
-        if (mapRef.current) {
-            mapRef.current.setZoom(mapRef.current.getZoom() - 1);
-        }
+        if (mapRef.current) mapRef.current.setZoom(mapRef.current.getZoom() - 1);
     }, []);
 
-    const handleInfoClick = useCallback(() => {
-        setIsInfoModalOpen(true);
-    }, []);
-
+    const handleInfoClick = useCallback(() => setIsInfoModalOpen(true), []);
     const handleCloseRegistrationModal = useCallback(() => setIsModalOpen(false), []);
     const handleCloseLeaderboard = useCallback(() => setIsLeaderboardOpen(false), []);
     const handleCloseInfoModal = useCallback(() => setIsInfoModalOpen(false), []);
 
     if (!isLoaded || !center) {
-        return <div>地圖載入中...</div>;
+        return <LoadingScreen />;
     }
 
     return (
         <div style={styles.app} className={isReturning ? 'map-container-fade-out' : ''}>
             <MapWithClouds
-                center={center} // Pass the center to the map
+                center={center}
                 onSelectCell={handleSelectCell}
                 claimedCells={claimedCells}
                 exploredCells={exploredCells}
@@ -352,15 +263,12 @@ function App() {
                 onZoomChanged={handleZoomChanged}
                 onCenterChanged={handleCenterChanged}
                 selectedCell={selectedCell}
-                onClaim={handleClaimCell}
-                userLocation={userLocation} // Pass the user location state down
+                userLocation={userLocation}
             />
 
-            {/* The CellInfoWindow is now a simple UI component rendered at the App level */}
             {selectedCell && (
                 <CellInfoWindow
                     cellInfo={selectedCell}
-                    onClaim={handleClaimCell}
                 />
             )}
 
@@ -371,7 +279,7 @@ function App() {
             </div>
 
             <div style={styles.topCenterContainer}>
-                <CloudCounter count={clouds}/>
+                <CloudCounter />
             </div>
 
             <div style={styles.topRightContainer}>
@@ -387,11 +295,9 @@ function App() {
                 {isModalOpen && (
                     <RegistrationModal onClose={handleCloseRegistrationModal} onRegister={handleRegister}/>
                 )}
-
                 {isLeaderboardOpen && (
                     <Leaderboard onClose={handleCloseLeaderboard}/>
                 )}
-
                 {isInfoModalOpen && (
                     <InfoModal onClose={handleCloseInfoModal}/>
                 )}
