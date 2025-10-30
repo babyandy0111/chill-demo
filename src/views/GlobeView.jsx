@@ -5,9 +5,9 @@ import { geoCentroid } from 'd3-geo';
 import * as THREE from 'three';
 import countriesData from './assets/countries.json';
 import earthImage from './assets/earth-8k.webp';
-import capitalsData from './assets/capitals.json';
-import Leaderboard from './Leaderboard.jsx';
-import cloudsTexture from './assets/clouds.png';
+import capitalsData from '../assets/capitals.json';
+import Leaderboard from '../components/Leaderboard.jsx';
+import cloudsTexture from '../assets/clouds.png';
 
 const featureMap = new Map(
     countriesData.features.map(feature => [feature, feature.properties])

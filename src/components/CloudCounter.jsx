@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAppStore } from './store';
+import { useAppStore } from '../store';
 
 const counterStyle = {
   backgroundColor: 'rgba(0, 0, 0, 0.7)',

@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
-import { playClickSound } from './audioPlayer.js';
-import { useAppStore } from './store.js';
+import { playClickSound } from '../audioPlayer.js';
+import { useAppStore } from '../store.js';
 
 const styles = {
   container: {

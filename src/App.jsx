@@ -1,18 +1,19 @@
 import React, {useState, useRef, useEffect, useCallback, lazy, Suspense} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
 import {useJsApiLoader} from '@react-google-maps/api';
-import MapWithClouds from './MapWithClouds.jsx';
-import CloudCounter from './CloudCounter.jsx';
-import Compass from './Compass.jsx';
-import CellInfoWindow from './CellInfoWindow.jsx';
+import MapWithClouds from './views/MapWithClouds.jsx';
+import CloudCounter from './components/CloudCounter.jsx';
+import Compass from './components/Compass.jsx';
+import CellInfoWindow from './components/CellInfoWindow.jsx';
 import {playClickSound} from './audioPlayer.js';
-import LoadingScreen from './LoadingScreen.jsx';
-import { useAppStore } from './store.js'; // Import the store
-import { smoothAnimate } from './map-animation.js'; // Import the shared animation function
+import LoadingScreen from './components/LoadingScreen.jsx';
+import { useAppStore } from './store.js';
+import { smoothAnimate } from './map-animation.js';
+import { useGeocoding } from './hooks/useGeocoding.js';
 
-const Leaderboard = lazy(() => import('./Leaderboard.jsx'));
-const RegistrationModal = lazy(() => import('./RegistrationModal.jsx'));
-const InfoModal = lazy(() => import('./InfoModal.jsx'));
+const Leaderboard = lazy(() => import('./components/Leaderboard.jsx'));
+const RegistrationModal = lazy(() => import('./components/RegistrationModal.jsx'));
+const InfoModal = lazy(() => import('./components/InfoModal.jsx'));
 
 const GRID_SIZE = 0.0005;
 
@@ -69,52 +70,43 @@ const styles = {
     },
 };
 
-const geocodeCache = new Map();
-const CACHE_GRID_SIZE = 0.5; // Define a larger grid for caching (approx. 55km)
-
 function App() {
     const { lat, lng } = useParams();
     const navigate = useNavigate();
     
-    // Initialize center synchronously from URL params to avoid race conditions.
     const [center, setCenter] = useState(() => {
         if (lat && lng) {
             return { lat: parseFloat(lat), lng: parseFloat(lng) };
         }
-        return null; // Will be set by useEffect if null
+        return null;
     });
 
     const [isReturning, setIsReturning] = useState(false);
     const mapRef = useRef(null);
 
-    // ... (store hooks remain the same)
     const claimedCells = useAppStore(state => state.claimedCells);
     const exploredCells = useAppStore(state => state.exploredCells);
     const selectedCell = useAppStore(state => state.selectedCell);
     const userLocation = useAppStore(state => state.userLocation);
     const initializeGeolocation = useAppStore(state => state.initializeGeolocation);
     const selectCell = useAppStore(state => state.selectCell);
-    const updateSelectedCellInfo = useAppStore(state => state.updateSelectedCellInfo);
     const claimSelectedCell = useAppStore(state => state.claimSelectedCell);
     const register = useAppStore(state => state.register);
+
+    // --- HOOKS ---
+    useGeocoding(selectedCell); // Geocoding logic is now self-contained in this hook
 
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
         googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     });
 
-    // Effect for initializing geolocation from the store (runs once)
     useEffect(() => {
         initializeGeolocation();
     }, [initializeGeolocation]);
 
-    // This effect now ONLY handles the fallback case for setting the center.
     useEffect(() => {
-        // If center is already set (from URL), do nothing.
-        if (center) {
-            return;
-        }
-        // Otherwise, get user's location or set a default.
+        if (center) return;
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 setCenter({
@@ -123,60 +115,24 @@ function App() {
                 });
             },
             () => {
-                // Fallback to Taipei if geolocation fails
                 setCenter({ lat: 25.033, lng: 121.5654 });
             }
         );
-    }, [center]); // Dependency ensures it runs only when center is null initially.
+    }, [center]);
 
-    // Local UI state for modals
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-    const [zoom, setZoom] = useState(10); // Keep zoom for now as it's used by MapWithClouds internally
+    const [zoom, setZoom] = useState(10);
 
     const setMapRef = useCallback((map) => {
         mapRef.current = map;
     }, []);
 
-    const handleSelectCell = async (key, position) => {
+    const handleSelectCell = useCallback((key, position) => {
         playClickSound();
-        // The logic to check if the cell should be selected is now in the store
         selectCell(key ? { key, position, isLoading: true } : null);
-
-        if (!key) return; // Exit if we are deselecting
-
-        const cacheKey = `${Math.floor(position.lat / CACHE_GRID_SIZE)}_${Math.floor(position.lng / CACHE_GRID_SIZE)}`;
-        if (geocodeCache.has(cacheKey)) {
-            updateSelectedCellInfo(geocodeCache.get(cacheKey));
-            return;
-        }
-
-        try {
-            const geocoder = new window.google.maps.Geocoder();
-            const response = await geocoder.geocode({ location: position });
-            let regionData;
-            if (response.results && response.results[0]) {
-                const address = response.results[0].address_components;
-                const country = address.find(c => c.types.includes('country'));
-                const region = address.find(c => c.types.includes('administrative_area_level_1'));
-                const countryName = country ? country.long_name : '未知領域';
-                const countryCode = country ? country.short_name.toLowerCase() : null;
-                const regionName = region ? region.long_name : '';
-                const flagUrl = countryCode ? `https://flagcdn.com/w40/${countryCode}.png` : null;
-                regionData = { countryName, regionName, flagUrl };
-            } else {
-                regionData = { countryName: '無法取得地點資訊', regionName: '', flagUrl: null };
-            }
-            geocodeCache.set(cacheKey, regionData);
-            updateSelectedCellInfo(regionData);
-        } catch (error) {
-            console.error("Geocoding failed:", error);
-            const errorData = { countryName: '地理資訊查詢失敗', regionName: '', flagUrl: null };
-            geocodeCache.set(cacheKey, errorData);
-            updateSelectedCellInfo(errorData);
-        }
-    };
+    }, [selectCell]);
 
     const handleClaimCell = useCallback(() => {
         const result = claimSelectedCell();
@@ -255,6 +211,7 @@ function App() {
             {selectedCell && (
                 <CellInfoWindow
                     cellInfo={selectedCell}
+                    onClaim={handleClaimCell}
                 />
             )}
 

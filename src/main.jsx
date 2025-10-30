@@ -2,11 +2,11 @@ import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import './index.css';
-import LoadingScreen from './LoadingScreen.jsx';
+import LoadingScreen from './components/LoadingScreen.jsx';
 
 // Lazily load both major components, ensuring the GlobeView has a minimum load time.
 const GlobeView = lazy(() => {
-    const globePromise = import('./GlobeView.jsx');
+    const globePromise = import('./views/GlobeView.jsx');
     const minDelayPromise = new Promise(resolve => setTimeout(resolve, 2000));
     // Wait for both the component to load and the minimum delay to pass.
     return Promise.all([globePromise, minDelayPromise]).then(([module]) => module);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import cloudImageSrc from './assets/cloud.png';
+import cloudImageSrc from '../assets/cloud.png';
 
 const GRID_SIZE = 0.0005;
 const cloudImage = new Image();

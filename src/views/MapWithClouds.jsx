@@ -1,9 +1,9 @@
 import React, {useState, useCallback, useEffect, useRef} from "react";
 import {GoogleMap} from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
-import CellInfoWindow from "./CellInfoWindow.jsx";
-import CurrentUserLocationMarker from "./CurrentUserLocationMarker.jsx";
-import { smoothAnimate } from "./map-animation.js"; // Import the smooth animation function
+import CellInfoWindow from "../components/CellInfoWindow.jsx";
+import CurrentUserLocationMarker from "../components/CurrentUserLocationMarker.jsx";
+import { smoothAnimate } from "../map-animation.js"; // Import the smooth animation function
 
 const GRID_SIZE = 0.0005;
 
