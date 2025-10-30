@@ -157,13 +157,11 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) 
             drawFog() {
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
-                const { zoom } = this.props;
 
                 this.fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
-                if (zoom < 15) return;
 
                 // 1. Fill with solid dark color
-                this.fogCtx.fillStyle = 'rgba(26, 26, 26, 0.7)';
+                this.fogCtx.fillStyle = 'rgba(26, 26, 26, 0.9)';
                 this.fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
 
                 // 2. Add noise texture
@@ -212,10 +210,8 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) 
             drawClouds() {
                 const projection = this.getProjection();
                 if (!projection || !cloudImage.complete || !this.swPixel) return;
-                const { zoom } = this.props;
 
                 this.cloudsCtx.clearRect(0, 0, this.cloudsCanvas.width, this.cloudsCanvas.height);
-                if (zoom < 15) return;
 
                 this.drawableClaimed.forEach(cell => {
                     const { south, west } = cell;
@@ -235,10 +231,10 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell }) 
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
 
-                const { zoom, hoveredCell } = this.props;
+                const { hoveredCell } = this.props;
                 this.dynamicCtx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
 
-                if (zoom < 15 || !hoveredCell) return;
+                if (!hoveredCell) return;
 
                 const [iy, ix] = hoveredCell.split('_').map(Number);
                 const south = iy * GRID_SIZE;
