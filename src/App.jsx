@@ -92,6 +92,8 @@ function App() {
     const selectCell = useAppStore(state => state.selectCell);
     const claimSelectedCell = useAppStore(state => state.claimSelectedCell);
     const register = useAppStore(state => state.register);
+    const isHydrated = useAppStore(state => state.isHydrated);
+    const hydrate = useAppStore(state => state.hydrate);
 
     // --- HOOKS ---
     useGeocoding(selectedCell); // Geocoding logic is now self-contained in this hook
@@ -101,9 +103,15 @@ function App() {
         googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     });
 
+    // Effect for initializing geolocation from the store (runs once)
     useEffect(() => {
         initializeGeolocation();
     }, [initializeGeolocation]);
+
+    // Effect for hydrating the store from IndexedDB
+    useEffect(() => {
+        hydrate();
+    }, [hydrate]);
 
     useEffect(() => {
         if (center) return;
@@ -190,7 +198,7 @@ function App() {
     const handleCloseLeaderboard = useCallback(() => setIsLeaderboardOpen(false), []);
     const handleCloseInfoModal = useCallback(() => setIsInfoModalOpen(false), []);
 
-    if (!isLoaded || !center) {
+    if (!isLoaded || !center || !isHydrated) {
         return <LoadingScreen />;
     }
 

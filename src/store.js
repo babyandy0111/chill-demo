@@ -1,39 +1,52 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { db } from './db'; // Import our IndexedDB instance
 
 const GRID_SIZE = 0.0005;
-
-// Helper function to load explored cells from localStorage
-const loadExploredCells = () => {
-    try {
-        const saved = localStorage.getItem('exploredCells');
-        return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-        console.error("Failed to load explored cells:", e);
-        return {};
-    }
-};
-
-// Helper function to save explored cells to localStorage
-const saveExploredCells = (cells) => {
-    try {
-        localStorage.setItem('exploredCells', JSON.stringify(cells));
-    } catch (e) {
-        console.error("Failed to save explored cells:", e);
-    }
-};
 
 export const useAppStore = create(
     immer((set, get) => ({
         // --- STATE ---
         clouds: 10,
         claimedCells: {},
-        exploredCells: loadExploredCells(),
+        exploredCells: {},
         selectedCell: null,
         userLocation: null,
-        
+        isHydrated: false, // New state to track if store has loaded from DB
+
         // --- ACTIONS ---
-        
+
+        // Hydrate the store from IndexedDB
+        hydrate: async () => {
+            try {
+                const [exploredCellsArray, claimedCellsArray, cloudsState] = await Promise.all([
+                    db.exploredCells.toArray(),
+                    db.claimedCells.toArray(),
+                    db.gameState.get('clouds'),
+                ]);
+
+                const exploredCells = {};
+                exploredCellsArray.forEach(cell => {
+                    exploredCells[cell.id] = true;
+                });
+
+                const claimedCells = {};
+                claimedCellsArray.forEach(cell => {
+                    claimedCells[cell.id] = cell.data; // Assuming 'data' holds {owner, color}
+                });
+
+                set((state) => {
+                    state.exploredCells = exploredCells;
+                    state.claimedCells = claimedCells;
+                    state.clouds = cloudsState ? cloudsState.value : 10; // Default to 10 if not found
+                    state.isHydrated = true;
+                });
+            } catch (error) {
+                console.error("Failed to hydrate store from IndexedDB:", error);
+                set((state) => { state.isHydrated = true; }); // Still set hydrated to true to unblock UI
+            }
+        },
+
         // Initializes geolocation tracking
         initializeGeolocation: () => {
             const watchId = navigator.geolocation.watchPosition(
@@ -48,19 +61,25 @@ export const useAppStore = create(
                         let changed = false;
                         const EXPLORE_RADIUS = 2;
 
+                        const cellsToAdd = [];
                         for (let i = -EXPLORE_RADIUS; i <= EXPLORE_RADIUS; i++) {
                             for (let j = -EXPLORE_RADIUS; j <= EXPLORE_RADIUS; j++) {
                                 if (i * i + j * j <= EXPLORE_RADIUS * EXPLORE_RADIUS) {
                                     const key = `${iy + i}_${ix + j}`;
                                     if (!currentExplored[key]) {
                                         state.exploredCells[key] = true;
+                                        cellsToAdd.push({ id: key });
                                         changed = true;
                                     }
                                 }
                             }
                         }
+
                         if (changed) {
-                           saveExploredCells(state.exploredCells);
+                            // Save to IndexedDB
+                            if (cellsToAdd.length > 0) {
+                                db.exploredCells.bulkAdd(cellsToAdd).catch(e => console.error("Failed to bulkAdd explored cells:", e));
+                            }
                         }
                     });
                 },
@@ -81,7 +100,7 @@ export const useAppStore = create(
                 set({ selectedCell: cell });
             }
         },
-        
+
         // Updates the selected cell with geocoded data
         updateSelectedCellInfo: (data) => {
             set((state) => {
@@ -98,17 +117,26 @@ export const useAppStore = create(
             if (clouds <= 0) return 'no-clouds';
 
             const { key } = selectedCell;
+            const cellData = { owner: 'user', color: '#3B82F6' }; // Data to store for claimed cell
+
             set((state) => {
                 state.clouds -= 1;
-                state.claimedCells[key] = { owner: 'user', color: '#3B82F6' };
+                state.claimedCells[key] = cellData;
                 state.selectedCell = null;
             });
+
+            // Save to IndexedDB
+            db.claimedCells.put({ id: key, data: cellData }).catch(e => console.error("Failed to put claimed cell:", e));
+            db.gameState.put({ key: 'clouds', value: get().clouds }).catch(e => console.error("Failed to put clouds state:", e));
+
             return 'claimed';
         },
 
         // Resets cloud count, e.g., after registration
         register: () => {
             set({ clouds: 10 });
+            // Save to IndexedDB
+            db.gameState.put({ key: 'clouds', value: 10 }).catch(e => console.error("Failed to put clouds state on register:", e));
         },
     }))
 );
