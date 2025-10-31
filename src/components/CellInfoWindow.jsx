@@ -1,6 +1,5 @@
-import React, { memo } from 'react';
-import { OverlayView } from '@react-google-maps/api';
-import { playClickSound } from '../audioPlayer.js';
+import React, {memo} from 'react';
+import {playClickSound} from '../audioPlayer.js';
 
 const styles = {
     container: {
@@ -99,107 +98,56 @@ const styles = {
         animation: 'spin 1s linear infinite',
         margin: '0 auto',
     },
-    // Keyframes for loader animation (if not already global)
-    // @keyframes spin {
-    //   0% { transform: rotate(0deg); }
-    //   100% { transform: rotate(360deg); }
-    // }
 };
 
-const CellInfoWindow = ({ cellInfo, onClaim, onClose, isClaimDisabled }) => {
+const CellInfoWindow = ({cellInfo, onClaim, onClose, isClaimDisabled}) => {
+    const {countryName, regionName, flagUrl, isLoading} = cellInfo;
 
-        const { countryName, regionName, flagUrl, isLoading } = cellInfo;
-
-    
-
-        const handleClaimClick = (e) => {
-
+    const handleClaimClick = (e) => {
         e.stopPropagation();
-
         playClickSound();
-
         onClaim();
-
     };
-
-    
 
     const handleCloseClick = (e) => {
-
         e.stopPropagation();
-
         playClickSound();
-
         onClose();
-
     };
 
-
-
     return (
-
         <div style={styles.container} onClick={(e) => e.stopPropagation()}>
-
             <button style={styles.closeButton} onClick={handleCloseClick}>&times;</button>
-
             <div style={styles.header}>
-
                 {isLoading ? (
-
                     <div style={styles.loader}></div>
-
                 ) : (
-
                     <>
-
-                        {flagUrl && <img src={flagUrl} alt="Flag" style={styles.flag} />}
-
+                        {flagUrl && <img src={flagUrl} alt="Flag" style={styles.flag}/>}
                         <div style={styles.location}>
-
                             <span style={styles.country}>{countryName}</span>
-
                             <span style={styles.region}>{regionName}</span>
-
-                            <span style={styles.coordinates}>{cellInfo.position.lat.toFixed(4)}, {cellInfo.position.lng.toFixed(4)}</span>
-
+                            <span
+                                style={styles.coordinates}>{cellInfo.position.lat.toFixed(4)}, {cellInfo.position.lng.toFixed(4)}</span>
                         </div>
-
                     </>
-
                 )}
-
             </div>
-
             <div style={styles.body}>
-
                 <p style={styles.text}>
-
                     Do you want to claim this area?
-
                 </p>
-
                 <button
-
                     style={styles.claimButton}
-
                     onClick={handleClaimClick}
-
                     disabled={isClaimDisabled}
-
                 >
-
                     <span style={styles.cloudIcon}>☁️</span>
-
                     Claim
-
                 </button>
-
             </div>
-
         </div>
-
     );
-
 };
 
 export default memo(CellInfoWindow);
