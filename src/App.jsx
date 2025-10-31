@@ -324,16 +324,6 @@ function App() {
                     <InfoModal onClose={handleCloseInfoModal}/>
                 )}
             </Suspense>
-
-            {/*<div style={{*/}
-            {/*    position: 'absolute',*/}
-            {/*    bottom: 0,*/}
-            {/*    left: 0,*/}
-            {/*    width: '100%',*/}
-            {/*    height: '25px',*/}
-            {/*    backgroundColor: '#3B82F6', // Example color, can be changed*/}
-            {/*    zIndex: 10, // Ensure it's above other content*/}
-            {/*}}></div>*/}
         </div>
     );
 }
