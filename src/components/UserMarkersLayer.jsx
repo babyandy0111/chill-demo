@@ -108,7 +108,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
     const defaultAvatarRef = useRef(null);
     const [loadedImages, setLoadedImages] = useState(0);
     const [hoveredUser, setHoveredUser] = useState(null);
-    const [clickedUser, setClickedUser] = useState(null);
+    const [clickedUser, setClickedUser] = useState(null); // Reintroduce local state
 
 
     // Ensure default avatar is created once
@@ -266,7 +266,6 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 const user = this.findUserAtPixel(e.offsetX, e.offsetY);
                 if (user) {
                     this.props.onSetClickedUser(user);
-                    e.stopPropagation(); // Prevent event from bubbling up to the map
                 }
             }
 
