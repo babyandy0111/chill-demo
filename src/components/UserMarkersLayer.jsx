@@ -261,7 +261,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 if (!isVisible || !quadtree) return;
 
                 const zoom = this.getMap().getZoom();
-                const ZOOM_THRESHOLD = 14;
+                const ZOOM_THRESHOLD = 12;
 
                 if (zoom < ZOOM_THRESHOLD) {
                     this.drawClusters(projection, sw, ne, bounds);
