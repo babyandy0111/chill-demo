@@ -272,19 +272,15 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 const bounds = this.getMap().getBounds();
                 if (!bounds) return;
 
-                // Convert the map's geographical bounds to pixel coordinates
                 const sw = projection.fromLatLngToDivPixel(bounds.getSouthWest());
                 const ne = projection.fromLatLngToDivPixel(bounds.getNorthEast());
 
-                // Calculate the dimensions and position for the canvas
                 const width = ne.x - sw.x;
                 const height = sw.y - ne.y;
 
-                // Position the canvas to perfectly cover the visible map area
                 this.canvas.style.left = `${sw.x}px`;
                 this.canvas.style.top = `${ne.y}px`;
 
-                // Ensure canvas internal resolution and CSS size match the viewport
                 if (this.canvas.width !== width || this.canvas.height !== height) {
                     this.canvas.width = width;
                     this.canvas.height = height;
@@ -292,77 +288,148 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                     this.canvas.style.height = `${height}px`;
                 }
 
-                // Clear the entire canvas for this frame
                 this.ctx.clearRect(0, 0, width, height);
 
-                // Get props for drawing
-                const { quadtree, renderedImageCache, isVisible, hoveredUser } = this.props;
+                const { quadtree, isVisible } = this.props;
                 if (!isVisible || !quadtree) return;
 
                 const zoom = this.getMap().getZoom();
-                const latSpan = Math.abs(bounds.getNorthEast().lat() - bounds.getSouthWest().lat());
-                const lngSpan = Math.abs(bounds.getNorthEast().lng() - bounds.getSouthWest().lng());
+                const ZOOM_THRESHOLD = 14;
 
-                // Calculate extended bounds for quadtree query (buffer zone)
-                const extendedBounds = {
-                    x0: bounds.getSouthWest().lng() - lngSpan * 0.25,
-                    y0: bounds.getSouthWest().lat() - latSpan * 0.25,
-                    x1: bounds.getNorthEast().lng() + lngSpan * 0.25,
-                    y1: bounds.getNorthEast().lat() + latSpan * 0.25,
-                };
+                if (zoom < ZOOM_THRESHOLD) {
+                    this.drawClusters(projection, sw, ne, bounds);
+                } else {
+                    this.drawIndividualMarkers(projection, sw, ne, bounds);
+                }
+            }
 
+            drawSingleMarker(user, projection, sw, ne) {
+                const { renderedImageCache, hoveredUser, imageCache, defaultAvatarRef } = this.props;
+                const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
+                if (!point) return;
+
+                const drawX = point.x - sw.x;
+                const drawY = point.y - ne.y;
+
+                const zoom = this.getMap().getZoom();
                 const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
+                const isHovered = hoveredUser && hoveredUser.seq === user.seq;
 
-                // Use quadtree to efficiently find and draw visible markers
+                let imageToDraw = renderedImageCache.get(user.avatarUrl);
+
+                if (imageToDraw) {
+                    this.ctx.drawImage(imageToDraw, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
+                } else {
+                    const cacheEntry = imageCache.get(user.avatarUrl);
+                    let rawImage = defaultAvatarRef.current;
+                    if (cacheEntry && cacheEntry.loaded === true) {
+                        rawImage = cacheEntry.image;
+                    }
+                    if (!rawImage) return; // Do not draw if image is not available yet
+                    this.ctx.save();
+                    this.ctx.beginPath();
+                    this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
+                    this.ctx.clip();
+                    this.ctx.drawImage(rawImage, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
+                    this.ctx.restore();
+                }
+
+                this.ctx.beginPath();
+                this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
+                this.ctx.strokeStyle = isHovered ? '#007BFF' : 'red';
+                this.ctx.lineWidth = isHovered ? 6 : 2;
+                this.ctx.stroke();
+            }
+
+            drawClusters(projection, sw, ne, bounds) {
+                const { quadtree } = this.props;
+                const gridSize = 80; // Cluster size in pixels
+                const clusters = new Map();
+                const visibleUsers = [];
+
                 quadtree.visit((node, x0, y0, x1, y1) => {
-                    // Pruning check
-                    if (x1 < extendedBounds.x0 || x0 > extendedBounds.x1 || y1 < extendedBounds.y0 || y0 > extendedBounds.y1) {
-                        return true;
+                    const nodeBounds = new window.google.maps.LatLngBounds(
+                        new window.google.maps.LatLng(y0, x0),
+                        new window.google.maps.LatLng(y1, x1)
+                    );
+                    if (!bounds.intersects(nodeBounds)) {
+                        return true; // Prune this branch
                     }
 
-                    // If it's a leaf node
-                    if (!node.length) {
+                    if (!node.length) { // It's a leaf node
                         let p = node;
                         do {
-                            const user = p.data;
-                            const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
-
-                            // We need to adjust the drawing coordinates to be relative to our canvas
-                            const drawX = point.x - sw.x;
-                            const drawY = point.y - ne.y;
-
-                            if (point) {
-                                const isHovered = hoveredUser && hoveredUser.seq === user.seq;
-
-                                let imageToDraw = renderedImageCache.get(user.avatarUrl);
-
-                                if (imageToDraw) {
-                                    // --- Fast Path: Use the pre-rendered cache ---
-                                    this.ctx.drawImage(imageToDraw, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
-                                } else {
-                                    // --- Fallback Path: Draw manually if not cached yet ---
-                                    const cacheEntry = imageCache.get(user.avatarUrl);
-                                    let rawImage = defaultAvatarRef.current; // Start with default
-                                    if (cacheEntry && cacheEntry.loaded) {
-                                        rawImage = cacheEntry.image; // Use loaded image if available
-                                    }
-
-                                    // Draw the raw image manually with circle clipping
-                                    this.ctx.save();
-                                    this.ctx.beginPath();
-                                    this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
-                                    this.ctx.clip();
-                                    this.ctx.drawImage(rawImage, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
-                                    this.ctx.restore();
-                                }
-
-                                // Draw the border, with hover effect
-                                this.ctx.beginPath();
-                                this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
-                                this.ctx.strokeStyle = isHovered ? '#007BFF' : 'red';
-                                this.ctx.lineWidth = isHovered ? 6 : 2;
-                                this.ctx.stroke();
+                            if (bounds.contains({lat: p.data.lat, lng: p.data.lng})) {
+                               visibleUsers.push(p.data);
                             }
+                        } while ((p = p.next));
+                    }
+                    return false; // Continue visiting children
+                });
+
+                for (const user of visibleUsers) {
+                    const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
+                    if (!point) continue;
+
+                    const key = `${Math.floor(point.x / gridSize)}|${Math.floor(point.y / gridSize)}`;
+                    if (!clusters.has(key)) {
+                        clusters.set(key, { points: [], sumLat: 0, sumLng: 0 });
+                    }
+                    const cluster = clusters.get(key);
+                    cluster.points.push(user);
+                    cluster.sumLat += user.lat;
+                    cluster.sumLng += user.lng;
+                }
+
+                for (const cluster of clusters.values()) {
+                    const count = cluster.points.length;
+                    if (count > 1) {
+                        const centerLat = cluster.sumLat / count;
+                        const centerLng = cluster.sumLng / count;
+                        const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(centerLat, centerLng));
+                        if (!point) continue;
+
+                        const drawX = point.x - sw.x;
+                        const drawY = point.y - ne.y;
+
+                        const radius = 18 + Math.log2(count) * 2;
+                        this.ctx.beginPath();
+                        this.ctx.arc(drawX, drawY, radius, 0, Math.PI * 2);
+                        this.ctx.fillStyle = 'rgba(0, 123, 255, 0.7)';
+                        this.ctx.fill();
+                        this.ctx.strokeStyle = 'rgba(0, 123, 255, 1)';
+                        this.ctx.lineWidth = 2;
+                        this.ctx.stroke();
+
+                        this.ctx.fillStyle = 'white';
+                        this.ctx.font = 'bold 14px sans-serif';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.textBaseline = 'middle';
+                        this.ctx.fillText(count, drawX, drawY);
+                    } else {
+                        this.drawSingleMarker(cluster.points[0], projection, sw, ne);
+                    }
+                }
+            }
+
+            drawIndividualMarkers(projection, sw, ne, bounds) {
+                const { quadtree } = this.props;
+
+                quadtree.visit((node, x0, y0, x1, y1) => {
+                    const nodeBounds = new window.google.maps.LatLngBounds(
+                        new window.google.maps.LatLng(y0, x0),
+                        new window.google.maps.LatLng(y1, x1)
+                    );
+                    if (!bounds.intersects(nodeBounds)) {
+                        return true; // Prune this branch
+                    }
+
+                    if (!node.length) { // It's a leaf node
+                        let p = node;
+                        do {
+                           if (bounds.contains({lat: p.data.lat, lng: p.data.lng})) {
+                               this.drawSingleMarker(p.data, projection, sw, ne);
+                           }
                         } while ((p = p.next));
                     }
                     return false; // Continue visiting children
@@ -391,6 +458,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 users,
                 quadtree,
                 renderedImageCache,
+                imageCache,
                 isVisible,
                 defaultAvatarRef: defaultAvatarRef.current,
                 hoveredUser,
