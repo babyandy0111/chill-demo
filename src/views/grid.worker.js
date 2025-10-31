@@ -3,11 +3,6 @@ const GRID_SIZE = 0.0005;
 self.onmessage = (e) => {
     const {bounds, zoom, claimedCells, exploredCells} = e.data;
 
-    if (zoom < 15) {
-        self.postMessage({claimedCellsToDraw: [], exploredCellsToDraw: []});
-        return;
-    }
-
     const sw = bounds.southwest;
     const ne = bounds.northeast;
 

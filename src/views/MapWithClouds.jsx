@@ -100,11 +100,6 @@ const MapWithClouds = ({
     }, [setHoveredCell]);
 
     const handleClick = useCallback((e) => {
-        if (zoom < 15) {
-            onSelectCell(null, null);
-            return;
-        }
-
         // Effect creation is no longer handled here
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
@@ -116,7 +111,7 @@ const MapWithClouds = ({
         const centerLat = south + GRID_SIZE / 2;
         const centerLng = west + GRID_SIZE / 2;
         onSelectCell(key, {lat: centerLat, lng: centerLng});
-    }, [zoom, onSelectCell]);
+    }, [onSelectCell]);
 
     const handleWheel = useCallback(async (e) => {
         e.preventDefault();
