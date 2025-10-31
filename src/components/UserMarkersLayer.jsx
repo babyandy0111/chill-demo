@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { OverlayView, Marker } from '@react-google-maps/api';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Marker } from '@react-google-maps/api';
+import { quadtree as d3_quadtree } from 'd3-quadtree';
 
 // --- Helper function to create a default placeholder avatar ---
 const createDefaultAvatar = () => {
@@ -31,17 +32,58 @@ const createDefaultAvatar = () => {
     return img;
 };
 
+// --- Helper function to create a pre-rendered circled image with a border ---
+// This function is now correctly defined at the top level.
+const createCircledImage = (image, size, borderColor, borderWidth) => {
+    const offscreenCanvas = document.createElement('canvas');
+    const context = offscreenCanvas.getContext('2d');
+    offscreenCanvas.width = size;
+    offscreenCanvas.height = size;
+
+    // Draw the circular clip
+    context.beginPath();
+    context.arc(size / 2, size / 2, size / 2 - borderWidth / 2, 0, Math.PI * 2, true);
+    context.clip();
+
+    // Draw the image
+    context.drawImage(image, 0, 0, size, size);
+
+    // Draw the border
+    context.beginPath();
+    context.arc(size / 2, size / 2, size / 2 - borderWidth / 2, 0, Math.PI * 2, true);
+    context.strokeStyle = borderColor;
+    context.lineWidth = borderWidth;
+    context.stroke();
+
+    return offscreenCanvas;
+};
+
+
 const UserMarkersLayer = ({ map, users, isVisible }) => {
-    const overlayViewRef = useRef(null);
-    const canvasRef = useRef(null);
-    const imageCache = useRef(new Map()).current;
+    const overlayRef = useRef(null); // Ref for our custom OverlayView instance
+    const imageCache = useRef(new Map()).current; // Cache for raw Image objects
+    const renderedImageCache = useRef(new Map()).current; // Cache for pre-rendered circled images
     const defaultAvatarRef = useRef(null);
     const [loadedImages, setLoadedImages] = useState(0);
 
+    // Ensure default avatar is created once
     if (!defaultAvatarRef.current) {
         defaultAvatarRef.current = createDefaultAvatar();
     }
 
+    // Quadtree for efficient spatial querying
+    const quadtree = useMemo(() => {
+        if (!users || users.length === 0) {
+            return null;
+        }
+        const newQuadtree = d3_quadtree()
+            .x(d => d.lng)
+            .y(d => d.lat)
+            .addAll(users);
+        return newQuadtree;
+    }, [users]);
+
+    // Effect to load and pre-render user avatars
     useEffect(() => {
         if (!users || users.length === 0) return;
 
@@ -55,113 +97,185 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
 
                 img.onload = () => {
                     cacheEntry.loaded = true;
+                    // Pre-render the image and store it in the rendered cache
+                    const renderedAvatar = createCircledImage(img, 128, 'red', 4); // Use a larger size for quality
+                    renderedImageCache.set(user.avatarUrl, renderedAvatar);
                     setLoadedImages(prev => prev + 1);
                 };
                 img.onerror = () => {
                     console.warn(`Failed to load image: ${user.avatarUrl}`);
                     cacheEntry.loaded = 'error';
                     cacheEntry.image = defaultAvatarRef.current;
+                    // Pre-render and cache the default avatar as well
+                    const renderedDefault = createCircledImage(defaultAvatarRef.current, 128, 'red', 4);
+                    renderedImageCache.set('default', renderedDefault);
                     setLoadedImages(prev => prev + 1);
                 };
             }
         });
-    }, [users, imageCache]);
+    }, [users, imageCache, renderedImageCache]);
 
-    const draw = useCallback(() => {
-        if (!map || !canvasRef.current || !isVisible || !overlayViewRef.current) return;
 
-        const context = canvasRef.current.getContext('2d');
-        const projection = overlayViewRef.current.getProjection();
-        const bounds = map.getBounds();
-        const zoom = map.getZoom();
-
-        if (!projection || !bounds) return;
-
-        const mapDiv = map.getDiv();
-        const width = mapDiv.clientWidth;
-        const height = mapDiv.clientHeight;
-
-        if (canvasRef.current.width !== width || canvasRef.current.height !== height) {
-            canvasRef.current.width = width;
-            canvasRef.current.height = height;
-        }
-
-        context.clearRect(0, 0, width, height);
-
-        const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
-        context.strokeStyle = 'red'; // Change border color to red
-        context.lineWidth = 2;
-
-        for (const user of users) {
-            if (user && bounds.contains({ lat: user.lat, lng: user.lng })) {
-                const latLng = new google.maps.LatLng(user.lat, user.lng);
-                const point = projection.fromLatLngToDivPixel(latLng);
-
-                if (point) {
-                    const x = point.x;
-                    const y = point.y;
-
-                    let imageToDraw = defaultAvatarRef.current;
-                    const cacheEntry = user.avatarUrl ? imageCache.get(user.avatarUrl) : null;
-
-                    if (cacheEntry && cacheEntry.loaded) {
-                        imageToDraw = cacheEntry.image;
-                    }
-
-                    context.save();
-                    context.beginPath();
-                    context.arc(x, y, imageSize / 2, 0, Math.PI * 2, true);
-                    context.clip();
-                    context.drawImage(imageToDraw, x - imageSize / 2, y - imageSize / 2, imageSize, imageSize);
-                    context.restore();
-
-                    context.beginPath();
-                    context.arc(x, y, imageSize / 2, 0, Math.PI * 2, true);
-                    context.stroke();
-                }
-            }
-        }
-    }, [map, users, isVisible, loadedImages]);
-
-    const handleOverlayLoad = useCallback((overlayView) => {
-        overlayViewRef.current = overlayView;
-        const panes = overlayView.getPanes();
-        if (panes && !canvasRef.current) {
-            const canvas = document.createElement('canvas');
-            canvas.style.position = 'absolute';
-            canvas.style.top = '0';
-            canvas.style.left = '0';
-            canvas.style.pointerEvents = 'none';
-            canvas.style.zIndex = '1';
-            panes.overlayLayer.appendChild(canvas);
-            canvasRef.current = canvas;
-        }
-    }, []);
-
-    useEffect(() => {
-        if (overlayViewRef.current) {
-            draw();
-        }
-    }, [draw, loadedImages]);
-
+    // Main effect to manage the custom Google Maps OverlayView
     useEffect(() => {
         if (!map) return;
-        const listener = map.addListener('bounds_changed', draw);
+
+        // Define our custom OverlayView class
+        class CustomUserOverlay extends window.google.maps.OverlayView {
+            constructor() {
+                super();
+                this.canvas = document.createElement('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.canvas.style.position = 'absolute';
+                this.canvas.style.pointerEvents = 'none';
+                this.canvas.style.zIndex = '1'; // Ensure it's above map tiles
+                this.props = {}; // To store React props
+            }
+
+            // Method to update props from React component
+            setProps(props) {
+                this.props = { ...this.props, ...props };
+                this.draw(); // Trigger redraw when props change
+            }
+
+            // Called when the overlay is added to the map
+            onAdd() {
+                const panes = this.getPanes();
+                panes.overlayLayer.appendChild(this.canvas);
+            }
+
+            // Called when the overlay is removed from the map
+            onRemove() {
+                if (this.canvas.parentElement) {
+                    this.canvas.parentElement.removeChild(this.canvas);
+                }
+            }
+
+            // Main drawing method, called by Google Maps API
+            draw() {
+                const projection = this.getProjection();
+                if (!projection) return;
+
+                const bounds = this.getMap().getBounds();
+                if (!bounds) return;
+
+                const mapDiv = this.getMap().getDiv();
+                const width = mapDiv.clientWidth;
+                const height = mapDiv.clientHeight;
+
+                // Ensure canvas internal resolution and CSS size match map viewport
+                if (this.canvas.width !== width || this.canvas.height !== height) {
+                    this.canvas.width = width;
+                    this.canvas.height = height;
+                    this.canvas.style.width = `${width}px`;
+                    this.canvas.style.height = `${height}px`;
+                }
+
+                // Clear the entire canvas for this frame
+                this.ctx.clearRect(0, 0, width, height);
+
+                // --- DEBUG LAYER: Semi-transparent green fill ---
+                this.ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                this.ctx.fillRect(0, 0, width, height);
+                // --- END DEBUG LAYER ---
+
+                // Get props for drawing
+                const { users, quadtree, renderedImageCache, isVisible } = this.props;
+                if (!isVisible || !quadtree) return;
+
+                const zoom = this.getMap().getZoom();
+                const ne = bounds.getNorthEast();
+                const sw = bounds.getSouthWest();
+                const latSpan = Math.abs(ne.lat() - sw.lat());
+                const lngSpan = Math.abs(ne.lng() - sw.lng());
+
+                // Calculate extended bounds for quadtree query (buffer zone)
+                const extendedBounds = {
+                    x0: sw.lng() - lngSpan * 0.25,
+                    y0: sw.lat() - latSpan * 0.25,
+                    x1: ne.lng() + lngSpan * 0.25,
+                    y1: ne.lat() + latSpan * 0.25,
+                };
+
+                const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
+
+                // Use quadtree to efficiently find and draw visible markers
+                quadtree.visit((node, x0, y0, x1, y1) => {
+                    // Pruning check
+                    if (x1 < extendedBounds.x0 || x0 > extendedBounds.x1 || y1 < extendedBounds.y0 || y0 > extendedBounds.y1) {
+                        return true;
+                    }
+
+                    // If it's a leaf node
+                    if (!node.length) {
+                        let p = node;
+                        do {
+                            const user = p.data;
+                            const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
+
+                            if (point) {
+                                let imageToDraw = renderedImageCache.get(user.avatarUrl);
+
+                                if (imageToDraw) {
+                                    // --- Fast Path: Use the pre-rendered cache ---
+                                    this.ctx.drawImage(imageToDraw, point.x - imageSize / 2, point.y - imageSize / 2, imageSize, imageSize);
+                                } else {
+                                    // --- Fallback Path: Draw manually if not cached yet ---
+                                    const cacheEntry = imageCache.get(user.avatarUrl);
+                                    let rawImage = defaultAvatarRef.current; // Start with default
+                                    if (cacheEntry && cacheEntry.loaded) {
+                                        rawImage = cacheEntry.image; // Use loaded image if available
+                                    }
+
+                                    // Draw the raw image manually with circle clipping
+                                    this.ctx.save();
+                                    this.ctx.beginPath();
+                                    this.ctx.arc(point.x, point.y, imageSize / 2, 0, Math.PI * 2, true);
+                                    this.ctx.clip();
+                                    this.ctx.drawImage(rawImage, point.x - imageSize / 2, point.y - imageSize / 2, imageSize, imageSize);
+                                    this.ctx.restore();
+
+                                    // Draw the border
+                                    this.ctx.beginPath();
+                                    this.ctx.arc(point.x, point.y, imageSize / 2, 0, Math.PI * 2, true);
+                                    this.ctx.strokeStyle = 'red';
+                                    this.ctx.lineWidth = 2;
+                                    this.ctx.stroke();
+                                }
+                            }
+                        } while (p = p.next);
+                    }
+                    return false; // Continue visiting children
+                });
+            }
+        }
+
+        // Instantiate and set our custom overlay on the map
+        const overlay = new CustomUserOverlay();
+        overlay.setMap(map);
+        overlayRef.current = overlay;
+
+        // Cleanup function for when the component unmounts
         return () => {
-            google.maps.event.removeListener(listener);
+            if (overlayRef.current) {
+                overlayRef.current.setMap(null);
+            }
         };
-    }, [map, draw]);
+    }, [map]); // Re-run this effect only if the map instance changes
+
+
+    // Effect to pass updated React props to the CustomUserOverlay instance
+    useEffect(() => {
+        if (overlayRef.current) {
+            overlayRef.current.setProps({ users, quadtree, renderedImageCache, isVisible, defaultAvatarRef: defaultAvatarRef.current });
+        }
+    }, [users, quadtree, renderedImageCache, isVisible, defaultAvatarRef.current]);
+
 
     return (
         <>
-            <OverlayView
-                position={{ lat: 0, lng: 0 }} // Restore a valid position object
-                mapPaneName={OverlayView.OVERLAY_LAYER}
-                onLoad={handleOverlayLoad}
-                onDraw={draw}
-            >
-                <></>
-            </OverlayView>
+            {/* The custom overlay is managed by the useEffect hook and native Google Maps API,
+                so it doesn't render a React component here. */}
             {isVisible && users.map((user, index) => (
                 <Marker
                     key={user.seq || index}
