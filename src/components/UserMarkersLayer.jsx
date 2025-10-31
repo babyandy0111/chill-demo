@@ -130,7 +130,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 this.canvas.style.left = '0px';
                 this.canvas.style.top = '0px';
                 this.canvas.style.pointerEvents = 'none';
-                this.canvas.style.zIndex = '1'; // Ensure it's above map tiles
+                this.canvas.style.zIndex = '5'; // Set a specific z-index
                 this.props = {}; // To store React props
             }
 
@@ -183,11 +183,6 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
 
                 // Clear the entire canvas for this frame
                 this.ctx.clearRect(0, 0, width, height);
-
-                // --- DEBUG LAYER: Semi-transparent green fill ---
-                this.ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-                this.ctx.fillRect(0, 0, width, height);
-                // --- END DEBUG LAYER ---
 
                 // Get props for drawing
                 const { users, quadtree, renderedImageCache, isVisible } = this.props;
@@ -288,12 +283,12 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
         <>
             {/* The custom overlay is managed by the useEffect hook and native Google Maps API,
                 so it doesn't render a React component here. */}
-            {isVisible && users.map((user, index) => (
-                <Marker
-                    key={user.seq || index}
-                    position={{ lat: user.lat, lng: user.lng }}
-                />
-            ))}
+            {/*{isVisible && users.map((user, index) => (*/}
+            {/*    <Marker*/}
+            {/*        key={user.seq || index}*/}
+            {/*        position={{ lat: user.lat, lng: user.lng }}*/}
+            {/*    />*/}
+            {/*))}*/}
         </>
     );
 };

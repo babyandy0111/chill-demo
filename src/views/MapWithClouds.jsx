@@ -155,13 +155,6 @@ const MapWithClouds = ({
                 onMouseOut={handleMouseOut}
                 onClick={handleClick}
             >
-                {mapInstance && userMarkers.length > 0 && (
-                    <UserMarkersLayer
-                        map={mapInstance}
-                        users={userMarkers}
-                        isVisible={true}
-                    />
-                )}
                 <CanvasOverlay
                     map={mapInstance}
                     zoom={zoom}
@@ -172,6 +165,13 @@ const MapWithClouds = ({
                     selectedCell={selectedCell}
                     effects={effects} // Pass effects to the canvas
                 />
+                {mapInstance && userMarkers.length > 0 && (
+                    <UserMarkersLayer
+                        map={mapInstance}
+                        users={userMarkers}
+                        isVisible={true}
+                    />
+                )}
                 {selectedCell && <CellInfoWindow cellInfo={selectedCell} />}
                 {userLocation && <CurrentUserLocationMarker position={userLocation} />}
             </GoogleMap>
