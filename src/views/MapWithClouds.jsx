@@ -136,6 +136,12 @@ const MapWithClouds = ({
         }, WHEEL_THROTTLE_MS);
     }, [mapInstance, setIsAnimating]);
 
+    const handleDragEnd = useCallback(() => {
+        if (!mapInstance) return;
+        const newCenter = mapInstance.getCenter();
+        onCenterChanged({ lat: newCenter.lat(), lng: newCenter.lng() });
+    }, [mapInstance, onCenterChanged]);
+
     return (
         <div className="view-container fade-in" style={mapRootStyle} onWheel={handleWheel}>
             <GoogleMap
@@ -151,6 +157,7 @@ const MapWithClouds = ({
                 }}
                 onLoad={handleMapLoad}
                 onIdle={handleIdle}
+                onDragEnd={handleDragEnd}
                 onMouseMove={handleMouseMove}
                 onMouseOut={handleMouseOut}
                 onClick={handleClick}
