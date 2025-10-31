@@ -33,10 +33,16 @@ const createDefaultAvatar = () => {
 
 // --- A simple popup component to show user info ---
 const UserInfoPopup = ({ user, onClose }) => {
-    const getPixelPositionOffset = (width, height) => ({
-        x: -(width / 2),
-        y: -(height + 40), // Position it above the marker
-    });
+    const getPixelPositionOffset = (width, height) => {
+        // Defensive check to prevent popup misplacement on initial render
+        if (!width || !height) {
+            return { x: 0, y: 0 };
+        }
+        return {
+            x: -(width / 2),
+            y: -(height + 40), // Position it above the marker
+        };
+    };
 
     return (
         <OverlayView

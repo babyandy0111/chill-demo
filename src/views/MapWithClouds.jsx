@@ -123,7 +123,7 @@ const MapWithClouds = ({
 
             const currentZoom = mapInstance.getZoom();
             const targetZoom = e.deltaY < 0 ? currentZoom + 1 : currentZoom - 1;
-            const clampedTargetZoom = Math.max(2, Math.min(15, targetZoom));
+            const clampedTargetZoom = Math.max(2, Math.min(20, targetZoom));
 
             if (clampedTargetZoom !== currentZoom) {
                 await smoothAnimate(mapInstance, mapInstance.getCenter().toJSON(), 300, clampedTargetZoom, setIsAnimating);
@@ -150,7 +150,7 @@ const MapWithClouds = ({
                     disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: false,
                     tilt: 0, mapTypeId: 'roadmap',
                     styles: mapStyles,
-                    minZoom: 2, maxZoom: 15,
+                    minZoom: 2, maxZoom: 20,
                     scrollwheel: false,
                 }}
                 onLoad={handleMapLoad}

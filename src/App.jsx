@@ -233,7 +233,7 @@ function App() {
     const handleZoomIn = useCallback(async () => {
         if (mapRef.current) {
             const currentZoom = mapRef.current.getZoom();
-            const targetZoom = Math.min(15, currentZoom + 1); // Clamp to maxZoom
+            const targetZoom = Math.min(20, currentZoom + 1); // Clamp to maxZoom
             if (targetZoom !== currentZoom) {
                 await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom, setIsAnimating); // Pass setIsAnimating
             }
