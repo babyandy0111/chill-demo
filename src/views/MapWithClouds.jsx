@@ -6,6 +6,7 @@ import CurrentUserLocationMarker from "../components/CurrentUserLocationMarker.j
 import { smoothAnimate } from "../map-animation.js";
 import { fetchUserLocations } from '../data-loader.js';
 import UserMarkersLayer from '../components/UserMarkersLayer.jsx';
+import ToggleSwitch from "../components/ToggleSwitch.jsx"; // Import the new component
 
 const GRID_SIZE = 0.0005;
 const mapContainerStyle = {width: "100%", height: "100%"};
@@ -19,6 +20,20 @@ const mapStyles = [
     {featureType: "administrative", stylers: [{visibility: "off"}]},
     {featureType: "landscape.natural", elementType: "labels", stylers: [{visibility: "off"}]},
 ];
+
+const styles = {
+    topRightContainer: {
+        position: 'absolute',
+        top: '20px',
+        right: '70px',
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        alignItems: 'flex-end',
+    },
+};
+
 
 const MapWithClouds = ({
                            center,
@@ -42,6 +57,7 @@ const MapWithClouds = ({
     const WHEEL_THROTTLE_MS = 150;
     const [isAnimating, setIsAnimating] = useState(false);
     const [userMarkers, setUserMarkers] = useState([]); // 新增 state 來儲存使用者標記數據
+    const [showClaimedCells, setShowClaimedCells] = useState(false); // State for the toggle switch
 
     // 在元件掛載時載入使用者數據
     useEffect(() => {
@@ -154,8 +170,12 @@ const MapWithClouds = ({
 
     return (
         <div ref={mapContainerRef} className="view-container fade-in" style={mapRootStyle}>
-            <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 100, background: 'rgba(255,255,255,0.7)', padding: '5px 10px', borderRadius: 5 }}>
-                Zoom: {zoom.toFixed(2)}
+            <div style={styles.topRightContainer}>
+                <ToggleSwitch
+                    label="顯示佔領區域"
+                    checked={showClaimedCells}
+                    onChange={setShowClaimedCells}
+                />
             </div>
             <GoogleMap
                 mapContainerStyle={mapContainerStyle}
@@ -178,8 +198,8 @@ const MapWithClouds = ({
                 <CanvasOverlay
                     map={mapInstance}
                     zoom={zoom}
-                    claimedCells={claimedCells}
-                    exploredCells={exploredCells}
+                    claimedCells={showClaimedCells ? claimedCells : []}
+                    exploredCells={showClaimedCells ? exploredCells : []}
                     hoveredCell={hoveredCell}
                     isAnimating={isAnimating}
                     selectedCell={selectedCell}
