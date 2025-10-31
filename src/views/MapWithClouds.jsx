@@ -64,8 +64,8 @@ const MapWithClouds = ({
     useEffect(() => {
         const runAnimation = async () => {
             if (mapInstance && center && !hasAnimatedRef.current) {
-                hasAnimatedRef.current = true;
                 await smoothAnimate(mapInstance, center, 2000, 15, setIsAnimating);
+                hasAnimatedRef.current = true;
                 handleIdle();
             }
         };
