@@ -72,7 +72,7 @@ const MapWithClouds = ({
     useEffect(() => {
         const runAnimation = async () => {
             if (mapInstance && center && !hasAnimatedRef.current) {
-                await smoothAnimate(mapInstance, center, 2000, 20, setIsAnimating); // Change zoom to 20
+                await smoothAnimate(mapInstance, center, 2000, 16, setIsAnimating);
                 hasAnimatedRef.current = true;
                 handleIdle();
             }
