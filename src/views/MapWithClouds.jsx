@@ -4,6 +4,8 @@ import CanvasOverlay from "./CanvasOverlay.jsx";
 import CellInfoWindow from "../components/CellInfoWindow.jsx";
 import CurrentUserLocationMarker from "../components/CurrentUserLocationMarker.jsx";
 import { smoothAnimate } from "../map-animation.js";
+import { fetchUserLocations } from '../data-loader.js';
+import UserMarkersLayer from '../components/UserMarkersLayer.jsx';
 
 const GRID_SIZE = 0.0005;
 const mapContainerStyle = {width: "100%", height: "100%"};
@@ -39,6 +41,12 @@ const MapWithClouds = ({
     const wheelThrottleTimeout = useRef(null);
     const WHEEL_THROTTLE_MS = 150;
     const [isAnimating, setIsAnimating] = useState(false);
+    const [userMarkers, setUserMarkers] = useState([]); // 新增 state 來儲存使用者標記數據
+
+    // 在元件掛載時載入使用者數據
+    useEffect(() => {
+        fetchUserLocations().then(setUserMarkers);
+    }, []);
 
     const handleMapLoad = useCallback((map) => {
         setMapInstance(map);
@@ -147,6 +155,13 @@ const MapWithClouds = ({
                 onMouseOut={handleMouseOut}
                 onClick={handleClick}
             >
+                {mapInstance && userMarkers.length > 0 && (
+                    <UserMarkersLayer
+                        map={mapInstance}
+                        users={userMarkers}
+                        isVisible={true}
+                    />
+                )}
                 <CanvasOverlay
                     map={mapInstance}
                     zoom={zoom}
