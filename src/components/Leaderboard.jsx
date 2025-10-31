@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState } from 'react';
 import { List, AutoSizer } from 'react-virtualized';
 import 'react-virtualized/styles.css'; // Import default styles
 

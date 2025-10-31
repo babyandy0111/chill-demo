@@ -1,6 +1,5 @@
 import React, { memo } from 'react';
 import { OverlayView } from '@react-google-maps/api';
-import { useAppStore } from '../store.js';
 import { playClickSound } from '../audioPlayer.js';
 
 const styles = {
@@ -109,13 +108,11 @@ const styles = {
 
 const CellInfoWindow = ({ cellInfo, onClaim, onClose, isClaimDisabled }) => {
 
-    const { countryName, regionName, flagUrl, isLoading } = cellInfo;
+        const { countryName, regionName, flagUrl, isLoading } = cellInfo;
 
-    const clouds = useAppStore((state) => state.clouds); // Re-add clouds state retrieval
+    
 
-
-
-    const handleClaimClick = (e) => {
+        const handleClaimClick = (e) => {
 
         e.stopPropagation();
 

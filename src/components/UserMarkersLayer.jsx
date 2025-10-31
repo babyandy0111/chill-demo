@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import { OverlayView } from '@react-google-maps/api';
 import { quadtree as d3_quadtree } from 'd3-quadtree';
 
@@ -31,33 +31,6 @@ const createDefaultAvatar = () => {
     img.src = canvas.toDataURL();
     return img;
 };
-
-// --- Helper function to create a pre-rendered circled image with a border ---
-// This function is now correctly defined at the top level.
-const createCircledImage = (image, size, borderColor, borderWidth) => {
-    const offscreenCanvas = document.createElement('canvas');
-    const context = offscreenCanvas.getContext('2d');
-    offscreenCanvas.width = size;
-    offscreenCanvas.height = size;
-
-    // Draw the circular clip
-    context.beginPath();
-    context.arc(size / 2, size / 2, size / 2 - borderWidth / 2, 0, Math.PI * 2, true);
-    context.clip();
-
-    // Draw the image
-    context.drawImage(image, 0, 0, size, size);
-
-    // Draw the border
-    context.beginPath();
-    context.arc(size / 2, size / 2, size / 2 - borderWidth / 2, 0, Math.PI * 2, true);
-    context.strokeStyle = borderColor;
-    context.lineWidth = borderWidth;
-    context.stroke();
-
-    return offscreenCanvas;
-};
-
 
 // --- A simple popup component to show user info ---
 const UserInfoPopup = ({ user, onClose }) => {
@@ -100,15 +73,38 @@ const UserInfoPopup = ({ user, onClose }) => {
     );
 };
 
-
 const UserMarkersLayer = ({ map, users, isVisible }) => {
     const overlayRef = useRef(null); // Ref for our custom OverlayView instance
     const imageCache = useRef(new Map()).current; // Cache for raw Image objects
     const renderedImageCache = useRef(new Map()).current; // Cache for pre-rendered circled images
     const defaultAvatarRef = useRef(null);
-    const [loadedImages, setLoadedImages] = useState(0);
     const [hoveredUser, setHoveredUser] = useState(null);
     const [clickedUser, setClickedUser] = useState(null); // Reintroduce local state
+
+    // Helper function to create a pre-rendered circled image with a border
+    const createCircledImage = useCallback((image, size, borderColor, borderWidth) => {
+        const offscreenCanvas = document.createElement('canvas');
+        const context = offscreenCanvas.getContext('2d');
+        offscreenCanvas.width = size;
+        offscreenCanvas.height = size;
+
+        // Draw the circular clip
+        context.beginPath();
+        context.arc(size / 2, size / 2, size / 2 - borderWidth / 2, 0, Math.PI * 2, true);
+        context.clip();
+
+        // Draw the image
+        context.drawImage(image, 0, 0, size, size);
+
+        // Draw the border
+        context.beginPath();
+        context.arc(size / 2, size / 2, size / 2 - borderWidth / 2, 0, Math.PI * 2, true);
+        context.strokeStyle = borderColor;
+        context.lineWidth = borderWidth;
+        context.stroke();
+
+        return offscreenCanvas;
+    }, []);
 
 
     // Ensure default avatar is created once
@@ -145,7 +141,6 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                     // Pre-render the image and store it in the rendered cache
                     const renderedAvatar = createCircledImage(img, 128, 'red', 4); // Use a larger size for quality
                     renderedImageCache.set(user.avatarUrl, renderedAvatar);
-                    setLoadedImages(prev => prev + 1);
                 };
                 img.onerror = () => {
                     console.warn(`Failed to load image: ${user.avatarUrl}`);
@@ -154,11 +149,10 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                     // Pre-render and cache the default avatar as well
                     const renderedDefault = createCircledImage(defaultAvatarRef.current, 128, 'red', 4);
                     renderedImageCache.set('default', renderedDefault);
-                    setLoadedImages(prev => prev + 1);
                 };
             }
         });
-    }, [users, imageCache, renderedImageCache]);
+    }, [users, imageCache, renderedImageCache, createCircledImage]);
 
 
     // Main effect to manage the custom Google Maps OverlayView
@@ -302,7 +296,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 this.ctx.clearRect(0, 0, width, height);
 
                 // Get props for drawing
-                const { users, quadtree, renderedImageCache, isVisible, hoveredUser } = this.props;
+                const { quadtree, renderedImageCache, isVisible, hoveredUser } = this.props;
                 if (!isVisible || !quadtree) return;
 
                 const zoom = this.getMap().getZoom();
@@ -369,7 +363,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                                 this.ctx.lineWidth = isHovered ? 6 : 2;
                                 this.ctx.stroke();
                             }
-                        } while (p = p.next);
+                        } while ((p = p.next));
                     }
                     return false; // Continue visiting children
                 });
@@ -387,7 +381,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 overlayRef.current.setMap(null);
             }
         };
-    }, [map]); // Re-run this effect only if the map instance changes
+    }, [map, imageCache]); // Re-run this effect only if the map instance changes
 
 
     // Effect to pass updated React props to the CustomUserOverlay instance
@@ -405,7 +399,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 onSetClickedUser: setClickedUser,
             });
         }
-    }, [users, quadtree, renderedImageCache, isVisible, hoveredUser, clickedUser]);
+    }, [users, quadtree, renderedImageCache, isVisible, hoveredUser, clickedUser, imageCache]);
 
 
     return (

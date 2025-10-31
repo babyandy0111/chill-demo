@@ -144,7 +144,6 @@ function App() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-    const [zoom, setZoom] = useState(10);
     const [isAnimating, setIsAnimating] = useState(false); // New state for animation status
     const [effects, setEffects] = useState([]); // Lifted effects state up to App.jsx
 
@@ -227,10 +226,6 @@ function App() {
         }
     }, [userLocation, setIsAnimating]);
 
-    const handleZoomChanged = useCallback((newZoom) => {
-        setZoom(newZoom);
-    }, []);
-
     const handleCenterChanged = useCallback((newCenter) => {
         navigate(`/map/${newCenter.lat.toFixed(7)}/${newCenter.lng.toFixed(7)}`, { replace: true });
     }, [navigate]);
@@ -272,7 +267,6 @@ function App() {
                 claimedCells={claimedCells}
                 exploredCells={exploredCells}
                 setMapRef={setMapRef}
-                onZoomChanged={handleZoomChanged}
                 onCenterChanged={handleCenterChanged}
                 selectedCell={selectedCell}
                 userLocation={userLocation}

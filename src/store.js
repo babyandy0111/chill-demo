@@ -65,7 +65,7 @@ export const useAppStore = create(
         
         // Initializes geolocation tracking
         initializeGeolocation: () => {
-            const watchId = navigator.geolocation.watchPosition(
+            navigator.geolocation.watchPosition(
                 (position) => {
                     const { latitude, longitude } = position.coords;
                     set((state) => {
