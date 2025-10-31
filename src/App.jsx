@@ -141,6 +141,7 @@ function App() {
     const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [zoom, setZoom] = useState(10);
     const [isAnimating, setIsAnimating] = useState(false); // New state for animation status
+    const [effects, setEffects] = useState([]); // Lifted effects state up to App.jsx
 
     const setMapRef = useCallback((map) => {
         mapRef.current = map;
@@ -152,11 +153,31 @@ function App() {
     }, [selectCell]);
 
     const handleClaimCell = useCallback(() => {
-        const result = claimSelectedCell();
-        if (result === 'no-clouds') {
-            setIsModalOpen(true);
-        }
-    }, [claimSelectedCell]);
+        if (!selectedCell) return;
+
+        // Create a single, unified effect object that the canvas can use to drive all animations.
+        const newEffect = {
+            id: Date.now() + Math.random(),
+            position: selectedCell.position,
+            startTime: Date.now(),
+            particleDuration: 2500,
+            revealDuration: 1000, // The reveal animation will take 1 second.
+            onComplete: () => { // Pass the claim function as a callback.
+                const result = claimSelectedCell();
+                if (result === 'no-clouds') {
+                    setIsModalOpen(true);
+                }
+            }
+        };
+
+        setEffects(currentEffects => [...currentEffects, newEffect]);
+        // The effect will remove itself from the canvas animation loop.
+        // We still need to clear the state in React.
+        setTimeout(() => {
+            setEffects(currentEffects => currentEffects.filter(effect => effect.id !== newEffect.id));
+        }, 2500); // Clear after the longest animation is done.
+
+    }, [claimSelectedCell, selectedCell]);
 
     const handleCloseInfoWindow = useCallback(() => {
         selectCell(null);
@@ -252,6 +273,7 @@ function App() {
                 userLocation={userLocation}
                 onZoomOutLimit={handleZoomOutLimit}
                 isAnimating={isAnimating}
+                effects={effects} // Pass down the effects
             />
 
             {selectedCell && (

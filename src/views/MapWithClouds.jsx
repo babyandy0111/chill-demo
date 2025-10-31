@@ -1,10 +1,9 @@
 import React, {useState, useCallback, useEffect, useRef} from "react";
-import { createPortal } from 'react-dom';
 import {GoogleMap} from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 import CellInfoWindow from "../components/CellInfoWindow.jsx";
 import CurrentUserLocationMarker from "../components/CurrentUserLocationMarker.jsx";
-import { smoothAnimate } from "../map-animation.js"; // Import the smooth animation function
+import { smoothAnimate } from "../map-animation.js";
 
 const GRID_SIZE = 0.0005;
 const mapContainerStyle = {width: "100%", height: "100%"};
@@ -30,6 +29,7 @@ const MapWithClouds = ({
                            selectedCell,
                            userLocation,
                            onZoomOutLimit,
+                           effects, // Receive effects as a prop
                        }) => {
     const [hoveredCell, setHoveredCell] = useState(null);
     const [zoom, setZoom] = useState(15);
@@ -37,10 +37,8 @@ const MapWithClouds = ({
     const throttleTimeout = useRef(null);
     const hasAnimatedRef = useRef(false);
     const wheelThrottleTimeout = useRef(null);
-    const WHEEL_THROTTLE_MS = 150; // Throttle wheel events
-    const [isAnimating, setIsAnimating] = useState(false); // New state for animation status
-    const [effects, setEffects] = useState([]);
-
+    const WHEEL_THROTTLE_MS = 150;
+    const [isAnimating, setIsAnimating] = useState(false);
 
     const handleMapLoad = useCallback((map) => {
         setMapInstance(map);
@@ -48,7 +46,7 @@ const MapWithClouds = ({
     }, [setMapRef]);
 
     const handleIdle = useCallback(() => {
-        if (!hasAnimatedRef.current || !mapInstance) return;
+        if (!mapInstance || !hasAnimatedRef.current) return;
 
         const newZoom = mapInstance.getZoom();
         const newCenter = mapInstance.getCenter();
@@ -67,7 +65,7 @@ const MapWithClouds = ({
         const runAnimation = async () => {
             if (mapInstance && center && !hasAnimatedRef.current) {
                 hasAnimatedRef.current = true;
-                await smoothAnimate(mapInstance, center, 2000, 15, setIsAnimating); // Pass setIsAnimating
+                await smoothAnimate(mapInstance, center, 2000, 15, setIsAnimating);
                 handleIdle();
             }
         };
@@ -75,9 +73,7 @@ const MapWithClouds = ({
     }, [mapInstance, center, handleIdle, setIsAnimating]);
 
     const handleMouseMove = useCallback((e) => {
-        if (throttleTimeout.current) {
-            return;
-        }
+        if (throttleTimeout.current) return;
         throttleTimeout.current = setTimeout(() => {
             throttleTimeout.current = null;
             if (zoom < 15) {
@@ -101,19 +97,7 @@ const MapWithClouds = ({
             return;
         }
 
-        // --- React-style effect creation ---
-        const newEffect = {
-            id: Date.now() + Math.random(), // Unique ID for the effect
-            size: Math.random() * 100 + 80,
-            x: e.domEvent.clientX,
-            y: e.domEvent.clientY,
-        };
-
-        setEffects(currentEffects => [...currentEffects, newEffect]);
-        setTimeout(() => {
-            setEffects(currentEffects => currentEffects.filter(effect => effect.id !== newEffect.id));
-        }, 5000); // Corresponds to animation duration
-
+        // Effect creation is no longer handled here
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
         const iy = Math.floor(lat / GRID_SIZE);
@@ -127,7 +111,7 @@ const MapWithClouds = ({
     }, [zoom, onSelectCell]);
 
     const handleWheel = useCallback(async (e) => {
-        e.preventDefault(); // Prevent default browser scroll behavior
+        e.preventDefault();
         if (wheelThrottleTimeout.current) return;
 
         wheelThrottleTimeout.current = setTimeout(async () => {
@@ -136,44 +120,26 @@ const MapWithClouds = ({
 
             const currentZoom = mapInstance.getZoom();
             const targetZoom = e.deltaY < 0 ? currentZoom + 1 : currentZoom - 1;
-
-            // Clamp targetZoom to min/max allowed by GoogleMap options
             const clampedTargetZoom = Math.max(5, Math.min(20, targetZoom));
 
             if (clampedTargetZoom !== currentZoom) {
-                await smoothAnimate(mapInstance, mapInstance.getCenter().toJSON(), 300, clampedTargetZoom, setIsAnimating); // Pass setIsAnimating
+                await smoothAnimate(mapInstance, mapInstance.getCenter().toJSON(), 300, clampedTargetZoom, setIsAnimating);
             }
         }, WHEEL_THROTTLE_MS);
     }, [mapInstance, setIsAnimating]);
 
     return (
         <div className="view-container fade-in" style={mapRootStyle} onWheel={handleWheel}>
-            {createPortal(
-                effects.map(effect => (
-                    <div
-                        key={effect.id}
-                        className="effect-3-particle"
-                        style={{
-                            width: `${effect.size}px`,
-                            height: `${effect.size}px`,
-                            left: `${effect.x - effect.size / 2}px`,
-                            top: `${effect.y - effect.size / 2}px`,
-                        }}
-                    />
-                )),
-                document.body
-            )}
             <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={center}
-                zoom={3} // Start zoomed out
+                zoom={3}
                 options={{
                     disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: false,
                     tilt: 0, mapTypeId: 'roadmap',
                     styles: mapStyles,
-                    minZoom: 5, // Set the minimum zoom level
-                    maxZoom: 20, // Set the maximum zoom level
-                    scrollwheel: false, // Disable default scrollwheel zoom
+                    minZoom: 5, maxZoom: 20,
+                    scrollwheel: false,
                 }}
                 onLoad={handleMapLoad}
                 onIdle={handleIdle}
@@ -188,16 +154,11 @@ const MapWithClouds = ({
                     exploredCells={exploredCells}
                     hoveredCell={hoveredCell}
                     isAnimating={isAnimating}
-                    selectedCell={selectedCell} // Pass selectedCell down
+                    selectedCell={selectedCell}
+                    effects={effects} // Pass effects to the canvas
                 />
-                {selectedCell && (
-                    <CellInfoWindow
-                        cellInfo={selectedCell}
-                    />
-                )}
-                {userLocation && (
-                    <CurrentUserLocationMarker position={userLocation}/>
-                )}
+                {selectedCell && <CellInfoWindow cellInfo={selectedCell} />}
+                {userLocation && <CurrentUserLocationMarker position={userLocation} />}
             </GoogleMap>
         </div>
     );
