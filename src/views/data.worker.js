@@ -52,8 +52,8 @@ self.onmessage = function(e) {
         })
         .then(csvText => {
             const parsedUsers = parseCSV(csvText);
-            const limitedUsers = parsedUsers.slice(0, 500);
-            self.postMessage({ success: true, users: limitedUsers });
+            // const limitedUsers = parsedUsers.slice(0, 20000);
+            self.postMessage({ success: true, users: parsedUsers });
         })
         .catch(error => {
             console.error('Error in worker while fetching or parsing CSV:', error);

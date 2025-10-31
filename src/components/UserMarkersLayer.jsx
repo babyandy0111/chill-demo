@@ -1,6 +1,5 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import { OverlayView } from '@react-google-maps/api';
-import { quadtree as d3_quadtree } from 'd3-quadtree';
 
 // --- Helper function to create a default placeholder avatar ---
 const createDefaultAvatar = () => {
@@ -75,51 +74,8 @@ const UserInfoPopup = ({ user, onClose }) => {
 
 const UserMarkersLayer = ({ map, users, isVisible }) => {
     const overlayRef = useRef(null); // Ref for our custom OverlayView instance
-    const imageCache = useRef(new Map()).current; // Cache for raw Image objects
-    const defaultAvatarRef = useRef(null);
     const [hoveredUser, setHoveredUser] = useState(null);
     const [clickedUser, setClickedUser] = useState(null); // Reintroduce local state
-
-    // Ensure default avatar is created once
-    if (!defaultAvatarRef.current) {
-        defaultAvatarRef.current = createDefaultAvatar();
-    }
-
-    // Quadtree for efficient spatial querying
-    const quadtree = useMemo(() => {
-        if (!users || users.length === 0) {
-            return null;
-        }
-        const newQuadtree = d3_quadtree()
-            .x(d => d.lng)
-            .y(d => d.lat)
-            .addAll(users);
-        return newQuadtree;
-    }, [users]);
-
-    // Effect to load and pre-render user avatars
-    useEffect(() => {
-        if (!users || users.length === 0) return;
-
-        users.forEach(user => {
-            if (user && user.avatarUrl && !imageCache.has(user.avatarUrl)) {
-                const img = new Image();
-                img.crossOrigin = "Anonymous";
-                img.src = user.avatarUrl;
-                const cacheEntry = { image: img, loaded: false };
-                imageCache.set(user.avatarUrl, cacheEntry);
-
-                img.onload = () => {
-                    cacheEntry.loaded = true;
-                };
-                img.onerror = () => {
-                    console.warn(`Failed to load image: ${user.avatarUrl}`);
-                    cacheEntry.loaded = 'error';
-                    cacheEntry.image = defaultAvatarRef.current;
-                };
-            }
-        });
-    }, [users, imageCache]);
 
 
     // Main effect to manage the custom Google Maps OverlayView
@@ -176,39 +132,40 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
 
             findUserAtPixel(x, y) {
                 const projection = this.getProjection();
-                if (!projection || !this.props.quadtree) return null;
+                if (!projection || !this.props.users) return null;
 
-                // We need the canvas's top-left corner in pixel coordinates to adjust the mouse position
-                const bounds = this.getMap().getBounds();
-                if (!bounds) return null;
-                const sw = projection.fromLatLngToDivPixel(bounds.getSouthWest());
-
-                // Adjust mouse coordinates to be absolute within the map div, not just the canvas
-                const absoluteX = x + sw.x;
-                const absoluteY = y + (projection.fromLatLngToDivPixel(bounds.getNorthEast())).y;
-
-
-                // Convert absolute pixel coordinates to LatLng
-                const latLng = projection.fromDivPixelToLatLng(new window.google.maps.Point(absoluteX, absoluteY));
+                // Directly convert mouse pixel coordinates (relative to the map div) to LatLng
+                const latLng = projection.fromDivPixelToLatLng(new window.google.maps.Point(x, y));
                 if (!latLng) return null;
 
-                // Find the nearest user in the quadtree
-                const searchRadius = 0.05; // Increased radius for better matching
-                const foundUser = this.props.quadtree.find(latLng.lng(), latLng.lat(), searchRadius);
-
-                if (foundUser) {
-                    // Verify if the cursor is actually within the user's marker circle
-                    const userPixel = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(foundUser.lat, foundUser.lng));
+                // Find the nearest user in the quadtree within a small geographic radius
+                const searchRadius = 0.01; // A small search radius in degrees
+                
+                // TODO: Replace quadtree.find with a more efficient method if needed, for now, we can iterate
+                const visibleUsers = this.props.users.filter(user => {
+                    const userPixel = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
+                    if (!userPixel) return false;
+                    const distance = Math.sqrt(Math.pow(x - userPixel.x, 2) + Math.pow(y - userPixel.y, 2));
                     const zoom = this.getMap().getZoom();
                     const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
-                    // Use absolute coordinates for distance check as well
-                    const distance = Math.sqrt(Math.pow(absoluteX - userPixel.x, 2) + Math.pow(absoluteY - userPixel.y, 2));
+                    return distance <= imageSize / 2;
+                });
 
-                    if (distance <= imageSize / 2) {
-                        return foundUser;
+                // Find the closest user among the visible ones
+                let closestUser = null;
+                let minDistance = Infinity;
+
+                for (const user of visibleUsers) {
+                    const userPixel = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
+                     if (!userPixel) continue;
+                    const distance = Math.sqrt(Math.pow(x - userPixel.x, 2) + Math.pow(y - userPixel.y, 2));
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestUser = user;
                     }
                 }
-                return null;
+
+                return closestUser;
             }
 
             handleMouseMove(e) {
@@ -231,22 +188,40 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
             }
 
 
-            // Main drawing method, called by Google Maps API
             draw() {
                 const projection = this.getProjection();
-                if (!projection) return;
+                if (!projection) {
+                    return;
+                }
 
-                const bounds = this.getMap().getBounds();
-                if (!bounds) return;
+                let bounds = this.getMap().getBounds();
+                if (!bounds) {
+                    return;
+                }
 
-                const sw = projection.fromLatLngToDivPixel(bounds.getSouthWest());
-                const ne = projection.fromLatLngToDivPixel(bounds.getNorthEast());
+                // --- Create an extended bounds for tolerance ---
+                const zoom = this.getMap().getZoom();
+                const extendFactor = 0.1; // Extend by 10% of the view
+                const sw = bounds.getSouthWest();
+                const ne = bounds.getNorthEast();
+                const lngDiff = (ne.lng() - sw.lng()) * extendFactor;
+                const latDiff = (ne.lat() - sw.lat()) * extendFactor;
 
-                const width = ne.x - sw.x;
-                const height = sw.y - ne.y;
+                const extendedBounds = new window.google.maps.LatLngBounds(
+                    new window.google.maps.LatLng(sw.lat() - latDiff, sw.lng() - lngDiff),
+                    new window.google.maps.LatLng(ne.lat() + latDiff, ne.lng() + lngDiff)
+                );
+                // --- End of extended bounds creation ---
 
-                this.canvas.style.left = `${sw.x}px`;
-                this.canvas.style.top = `${ne.y}px`;
+
+                const swPixel = projection.fromLatLngToDivPixel(bounds.getSouthWest());
+                const nePixel = projection.fromLatLngToDivPixel(bounds.getNorthEast());
+
+                const width = nePixel.x - swPixel.x;
+                const height = swPixel.y - nePixel.y;
+
+                this.canvas.style.left = `${swPixel.x}px`;
+                this.canvas.style.top = `${nePixel.y}px`;
 
                 if (this.canvas.width !== width || this.canvas.height !== height) {
                     this.canvas.width = width;
@@ -258,148 +233,104 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 this.ctx.clearRect(0, 0, width, height);
 
                 const { quadtree, isVisible } = this.props;
-                if (!isVisible || !quadtree) return;
+                if (!isVisible) return;
 
-                const zoom = this.getMap().getZoom();
                 const ZOOM_THRESHOLD = 12;
 
                 if (zoom < ZOOM_THRESHOLD) {
-                    this.drawClusters(projection, sw, ne, bounds);
+                    this.drawClusters(projection, swPixel, nePixel, extendedBounds);
                 } else {
-                    this.drawIndividualMarkers(projection, sw, ne, bounds);
+                    this.drawIndividualMarkers(projection, swPixel, nePixel, extendedBounds);
                 }
             }
 
-            drawSingleMarker(user, projection, sw, ne) {
-                const { hoveredUser, imageCache, defaultAvatarRef } = this.props;
+            drawSingleMarker(user, projection, swPixel, nePixel) {
+                const { hoveredUser } = this.props;
                 const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
                 if (!point) return;
 
-                const drawX = point.x - sw.x;
-                const drawY = point.y - ne.y;
+                const drawX = point.x - swPixel.x;
+                const drawY = point.y - nePixel.y;
 
                 const zoom = this.getMap().getZoom();
-                const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
+                const markerSize = Math.max(8, Math.min(40, (zoom - 12) * 4)); // Smaller size for simple markers
                 const isHovered = hoveredUser && hoveredUser.seq === user.seq;
 
-                const cacheEntry = imageCache.get(user.avatarUrl);
-                let imageToDraw = defaultAvatarRef.current; // Default to placeholder
-                if (cacheEntry && cacheEntry.loaded === true) {
-                    imageToDraw = cacheEntry.image;
-                }
-
-                if (!imageToDraw) return; // Don't draw if the default isn't even ready
-
-                // --- Real-time circular drawing ---
-                this.ctx.save();
+                // Draw a simple colored circle
                 this.ctx.beginPath();
-                this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
-                this.ctx.clip();
-                this.ctx.drawImage(imageToDraw, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
-                this.ctx.restore();
-                // --- End of real-time circular drawing ---
+                this.ctx.arc(drawX, drawY, markerSize / 2, 0, Math.PI * 2, true);
+                this.ctx.fillStyle = isHovered ? '#007BFF' : '#FF0000'; // Blue for hovered, Red for normal
+                this.ctx.fill();
 
-                this.ctx.beginPath();
-                this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
-                this.ctx.strokeStyle = isHovered ? '#007BFF' : 'red';
-                this.ctx.lineWidth = isHovered ? 6 : 2;
+                // Draw border
+                this.ctx.strokeStyle = isHovered ? '#0056b3' : '#cc0000';
+                this.ctx.lineWidth = isHovered ? 3 : 1;
                 this.ctx.stroke();
             }
 
-            drawClusters(projection, sw, ne, bounds) {
-                const { quadtree } = this.props;
-                const zoom = this.getMap().getZoom();
+                                    drawClusters(projection, swPixel, nePixel, extendedBounds) {
+                                        const { users } = this.props;
+                                        const zoom = this.getMap().getZoom();
+                                        
+                                        // Adjust the grid size based on zoom level for geographical clustering
+                                        const gridSizeDegrees = 1.0 / Math.pow(2, zoom - 5);
+
+                                        const clusters = new Map();
+                                        
+                                        // --- Brute-force filter instead of quadtree ---
+                                        const visibleUsers = users.filter(user => extendedBounds.contains({ lat: user.lat, lng: user.lng }));
+                                        
+                                        for (const user of visibleUsers) {
+                                            const key = `${Math.floor(user.lat / gridSizeDegrees)}|${Math.floor(user.lng / gridSizeDegrees)}`;
+                                            if (!clusters.has(key)) {
+                                                clusters.set(key, { points: [], sumLat: 0, sumLng: 0 });
+                                            }
+                                            const cluster = clusters.get(key);
+                                            cluster.points.push(user);
+                                            cluster.sumLat += user.lat;
+                                            cluster.sumLng += user.lng;
+                                        }
+                                        
+                                        for (const cluster of clusters.values()) {
+                                            const count = cluster.points.length;
+                                            if (count > 1) {
+                                                const centerLat = cluster.sumLat / count;
+                                                const centerLng = cluster.sumLng / count;
+                                                const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(centerLat, centerLng));
+                                                if (!point) continue;
+                        
+                                                const drawX = point.x - swPixel.x;
+                                                const drawY = point.y - nePixel.y;
+                        
+                                                const radius = 18 + Math.log2(count) * 2;
+                                                this.ctx.beginPath();
+                                                this.ctx.arc(drawX, drawY, radius, 0, Math.PI * 2);
+                                                this.ctx.fillStyle = 'rgba(0, 123, 255, 0.7)';
+                                                this.ctx.fill();
+                                                this.ctx.strokeStyle = 'rgba(0, 123, 255, 1)';
+                                                this.ctx.lineWidth = 2;
+                                                this.ctx.stroke();
+                        
+                                                this.ctx.fillStyle = 'white';
+                                                this.ctx.font = 'bold 18px sans-serif'; // Increased font size
+                                                this.ctx.textAlign = 'center';
+                                                this.ctx.textBaseline = 'middle';
+                                                this.ctx.fillText(count, drawX, drawY);
+                                            } else {
+                                                this.drawSingleMarker(cluster.points[0], projection, swPixel, nePixel);
+                                            }
+                                        }
+                                    }            drawIndividualMarkers(projection, swPixel, nePixel, extendedBounds) {
+                const { users } = this.props;
+                let drawnCount = 0;
+
+                for (const user of users) {
+                    if (extendedBounds.contains({ lat: user.lat, lng: user.lng })) {
+                        this.drawSingleMarker(user, projection, swPixel, nePixel);
+                        drawnCount++;
+                    }
+                }
                 
-                // Adjust the grid size based on zoom level for geographical clustering
-                const gridSizeDegrees = 0.5 / Math.pow(2, zoom - 5);
-
-                const clusters = new Map();
-                const visibleUsers = [];
-
-                quadtree.visit((node, x0, y0, x1, y1) => {
-                    const nodeBounds = new window.google.maps.LatLngBounds(
-                        new window.google.maps.LatLng(y0, x0),
-                        new window.google.maps.LatLng(y1, x1)
-                    );
-                    if (!bounds.intersects(nodeBounds)) {
-                        return true; // Prune this branch
-                    }
-
-                    if (!node.length) { // It's a leaf node
-                        let p = node;
-                        do {
-                            if (bounds.contains({lat: p.data.lat, lng: p.data.lng})) {
-                               visibleUsers.push(p.data);
-                            }
-                        } while ((p = p.next));
-                    }
-                    return false; // Continue visiting children
-                });
-
-                for (const user of visibleUsers) {
-                    const key = `${Math.floor(user.lat / gridSizeDegrees)}|${Math.floor(user.lng / gridSizeDegrees)}`;
-                    if (!clusters.has(key)) {
-                        clusters.set(key, { points: [], sumLat: 0, sumLng: 0 });
-                    }
-                    const cluster = clusters.get(key);
-                    cluster.points.push(user);
-                    cluster.sumLat += user.lat;
-                    cluster.sumLng += user.lng;
-                }
-
-                for (const cluster of clusters.values()) {
-                    const count = cluster.points.length;
-                    if (count > 1) {
-                        const centerLat = cluster.sumLat / count;
-                        const centerLng = cluster.sumLng / count;
-                        const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(centerLat, centerLng));
-                        if (!point) continue;
-
-                        const drawX = point.x - sw.x;
-                        const drawY = point.y - ne.y;
-
-                        const radius = 18 + Math.log2(count) * 2;
-                        this.ctx.beginPath();
-                        this.ctx.arc(drawX, drawY, radius, 0, Math.PI * 2);
-                        this.ctx.fillStyle = 'rgba(0, 123, 255, 0.7)';
-                        this.ctx.fill();
-                        this.ctx.strokeStyle = 'rgba(0, 123, 255, 1)';
-                        this.ctx.lineWidth = 2;
-                        this.ctx.stroke();
-
-                        this.ctx.fillStyle = 'white';
-                        this.ctx.font = 'bold 14px sans-serif';
-                        this.ctx.textAlign = 'center';
-                        this.ctx.textBaseline = 'middle';
-                        this.ctx.fillText(count, drawX, drawY);
-                    } else {
-                        this.drawSingleMarker(cluster.points[0], projection, sw, ne);
-                    }
-                }
-            }
-
-            drawIndividualMarkers(projection, sw, ne, bounds) {
-                const { quadtree } = this.props;
-
-                quadtree.visit((node, x0, y0, x1, y1) => {
-                    const nodeBounds = new window.google.maps.LatLngBounds(
-                        new window.google.maps.LatLng(y0, x0),
-                        new window.google.maps.LatLng(y1, x1)
-                    );
-                    if (!bounds.intersects(nodeBounds)) {
-                        return true; // Prune this branch
-                    }
-
-                    if (!node.length) { // It's a leaf node
-                        let p = node;
-                        do {
-                           if (bounds.contains({lat: p.data.lat, lng: p.data.lng})) {
-                               this.drawSingleMarker(p.data, projection, sw, ne);
-                           }
-                        } while ((p = p.next));
-                    }
-                    return false; // Continue visiting children
-                });
             }
         }
 
@@ -414,7 +345,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 overlayRef.current.setMap(null);
             }
         };
-    }, [map, imageCache]); // Re-run this effect only if the map instance changes
+    }, [map]); // Re-run this effect only if the map instance changes
 
 
     // Effect to pass updated React props to the CustomUserOverlay instance
@@ -422,17 +353,14 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
         if (overlayRef.current) {
             overlayRef.current.setProps({
                 users,
-                quadtree,
-                imageCache,
                 isVisible,
-                defaultAvatarRef: defaultAvatarRef.current,
                 hoveredUser,
                 clickedUser,
                 onSetHoveredUser: setHoveredUser,
                 onSetClickedUser: setClickedUser,
             });
         }
-    }, [users, quadtree, isVisible, hoveredUser, clickedUser, imageCache]);
+    }, [users, isVisible, hoveredUser, clickedUser]);
 
 
     return (

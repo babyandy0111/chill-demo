@@ -72,7 +72,7 @@ const MapWithClouds = ({
     useEffect(() => {
         const runAnimation = async () => {
             if (mapInstance && center && !hasAnimatedRef.current) {
-                await smoothAnimate(mapInstance, center, 2000, 15, setIsAnimating);
+                await smoothAnimate(mapInstance, center, 2000, 10, setIsAnimating);
                 hasAnimatedRef.current = true;
                 handleIdle();
             }
@@ -128,7 +128,7 @@ const MapWithClouds = ({
 
             const currentZoom = mapInstance.getZoom();
             const targetZoom = e.deltaY < 0 ? currentZoom + 1 : currentZoom - 1;
-            const clampedTargetZoom = Math.max(5, Math.min(20, targetZoom));
+            const clampedTargetZoom = Math.max(2, Math.min(15, targetZoom));
 
             if (clampedTargetZoom !== currentZoom) {
                 await smoothAnimate(mapInstance, mapInstance.getCenter().toJSON(), 300, clampedTargetZoom, setIsAnimating);
@@ -144,6 +144,9 @@ const MapWithClouds = ({
 
     return (
         <div className="view-container fade-in" style={mapRootStyle} onWheel={handleWheel}>
+            <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 100, background: 'rgba(255,255,255,0.7)', padding: '5px 10px', borderRadius: 5 }}>
+                Zoom: {zoom.toFixed(2)}
+            </div>
             <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={center}
@@ -152,7 +155,7 @@ const MapWithClouds = ({
                     disableDefaultUI: true, gestureHandling: 'greedy', zoomControl: false,
                     tilt: 0, mapTypeId: 'roadmap',
                     styles: mapStyles,
-                    minZoom: 5, maxZoom: 20,
+                    minZoom: 2, maxZoom: 15,
                     scrollwheel: false,
                 }}
                 onLoad={handleMapLoad}

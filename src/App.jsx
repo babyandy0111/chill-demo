@@ -202,16 +202,16 @@ function App() {
         navigate('/', { state: { lat, lng } });
     }, [navigate, setIsAnimating]);
 
-    const handleZoomOutLimit = useCallback(() => {
-        if (window.confirm("您已縮放到最小級別，要返回地球儀嗎？")) {
-            handleReturnToGlobe();
-        } else {
-            // If user cancels, zoom back in a bit to avoid being stuck
-            if (mapRef.current) {
-                mapRef.current.setZoom(mapRef.current.getZoom() + 1);
-            }
-        }
-    }, [handleReturnToGlobe]);
+    // const handleZoomOutLimit = useCallback(() => {
+    //     if (window.confirm("您已縮放到最小級別，要返回地球儀嗎？")) {
+    //         handleReturnToGlobe();
+    //     } else {
+    //         // If user cancels, zoom back in a bit to avoid being stuck
+    //         if (mapRef.current) {
+    //             mapRef.current.setZoom(mapRef.current.getZoom() + 1);
+    //         }
+    //     }
+    // }, [handleReturnToGlobe]);
 
     const handleCompassClick = useCallback(async () => {
         if (userLocation && mapRef.current) {
@@ -233,7 +233,7 @@ function App() {
     const handleZoomIn = useCallback(async () => {
         if (mapRef.current) {
             const currentZoom = mapRef.current.getZoom();
-            const targetZoom = Math.min(20, currentZoom + 1); // Clamp to maxZoom
+            const targetZoom = Math.min(15, currentZoom + 1); // Clamp to maxZoom
             if (targetZoom !== currentZoom) {
                 await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom, setIsAnimating); // Pass setIsAnimating
             }
@@ -243,7 +243,7 @@ function App() {
     const handleZoomOut = useCallback(async () => {
         if (mapRef.current) {
             const currentZoom = mapRef.current.getZoom();
-            const targetZoom = Math.max(5, currentZoom - 1); // Clamp to minZoom
+            const targetZoom = Math.max(2, currentZoom - 1); // Clamp to minZoom
             if (targetZoom !== currentZoom) {
                 await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom, setIsAnimating); // Pass setIsAnimating
             }
@@ -271,7 +271,7 @@ function App() {
                 onCenterChanged={handleCenterChanged}
                 selectedCell={selectedCell}
                 userLocation={userLocation}
-                onZoomOutLimit={handleZoomOutLimit}
+                // onZoomOutLimit={handleZoomOutLimit}
                 isAnimating={isAnimating}
                 effects={effects} // Pass down the effects
             />
