@@ -343,7 +343,11 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
 
             drawClusters(projection, sw, ne, bounds) {
                 const { quadtree } = this.props;
-                const gridSize = 80; // Cluster size in pixels
+                const zoom = this.getMap().getZoom();
+                
+                // Adjust the grid size based on zoom level for geographical clustering
+                const gridSizeDegrees = 0.5 / Math.pow(2, zoom - 5);
+
                 const clusters = new Map();
                 const visibleUsers = [];
 
@@ -368,10 +372,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 });
 
                 for (const user of visibleUsers) {
-                    const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
-                    if (!point) continue;
-
-                    const key = `${Math.floor(point.x / gridSize)}|${Math.floor(point.y / gridSize)}`;
+                    const key = `${Math.floor(user.lat / gridSizeDegrees)}|${Math.floor(user.lng / gridSizeDegrees)}`;
                     if (!clusters.has(key)) {
                         clusters.set(key, { points: [], sumLat: 0, sumLng: 0 });
                     }
