@@ -132,6 +132,11 @@ function App() {
             },
             () => {
                 setCenter({ lat: 25.033, lng: 121.5654 });
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0,
             }
         );
     }, [center]);
