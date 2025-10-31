@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Marker } from '@react-google-maps/api';
+import { OverlayView } from '@react-google-maps/api';
 import { quadtree as d3_quadtree } from 'd3-quadtree';
 
 // --- Helper function to create a default placeholder avatar ---
@@ -59,12 +59,57 @@ const createCircledImage = (image, size, borderColor, borderWidth) => {
 };
 
 
+// --- A simple popup component to show user info ---
+const UserInfoPopup = ({ user, onClose }) => {
+    // This function helps get the correct pane for the OverlayView.
+    // 'floatPane' is generally a good choice for UI elements that should appear above markers.
+    const getPixelPositionOffset = (width, height) => ({
+        x: -(width / 2),
+        y: -(height + 40), // Position it above the marker
+    });
+
+    return (
+        <OverlayView
+            position={{ lat: user.lat, lng: user.lng }}
+            mapPaneName={OverlayView.FLOAT_PANE}
+            getPixelPositionOffset={getPixelPositionOffset}
+        >
+            <div onMouseDown={(e) => e.stopPropagation()} style={{
+                background: 'white',
+                padding: '10px 15px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px',
+                width: '150px',
+            }}>
+                <img src={user.avatarUrl} alt={user.name} style={{ width: '50px', height: '50px', borderRadius: '50%' }} />
+                <strong style={{ fontSize: '14px' }}>{user.name || 'Anonymous'}</strong>
+                <button onClick={onClose} style={{
+                    position: 'absolute', top: '8px', right: '8px', background: '#F0F0F0',
+                    border: 'none', fontSize: '14px', cursor: 'pointer', color: '#888',
+                    zIndex: 10, // Ensure it's above other content in the popup
+                    width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                    &times;
+                </button>
+            </div>
+        </OverlayView>
+    );
+};
+
+
 const UserMarkersLayer = ({ map, users, isVisible }) => {
     const overlayRef = useRef(null); // Ref for our custom OverlayView instance
     const imageCache = useRef(new Map()).current; // Cache for raw Image objects
     const renderedImageCache = useRef(new Map()).current; // Cache for pre-rendered circled images
     const defaultAvatarRef = useRef(null);
     const [loadedImages, setLoadedImages] = useState(0);
+    const [hoveredUser, setHoveredUser] = useState(null);
+    const [clickedUser, setClickedUser] = useState(null);
+
 
     // Ensure default avatar is created once
     if (!defaultAvatarRef.current) {
@@ -129,9 +174,14 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 this.canvas.style.position = 'absolute';
                 this.canvas.style.left = '0px';
                 this.canvas.style.top = '0px';
-                this.canvas.style.pointerEvents = 'none';
+                this.canvas.style.pointerEvents = 'none'; // Let clicks pass through to the map by default
                 this.canvas.style.zIndex = '5'; // Set a specific z-index
                 this.props = {}; // To store React props
+                this.mapDiv = null; // To hold a reference to the map's div
+
+                // Bind event handlers
+                this.handleMouseMove = this.handleMouseMove.bind(this);
+                this.handleClick = this.handleClick.bind(this);
             }
 
             // Method to update props from React component
@@ -144,6 +194,10 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
             onAdd() {
                 const panes = this.getPanes();
                 panes.overlayLayer.appendChild(this.canvas);
+                // Store the map div and add event listeners
+                this.mapDiv = this.getMap().getDiv();
+                this.mapDiv.addEventListener('mousemove', this.handleMouseMove);
+                this.mapDiv.addEventListener('click', this.handleClick);
             }
 
             // Called when the overlay is removed from the map
@@ -151,7 +205,71 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 if (this.canvas.parentElement) {
                     this.canvas.parentElement.removeChild(this.canvas);
                 }
+                // Clean up event listeners from the stored div
+                if (this.mapDiv) {
+                    this.mapDiv.removeEventListener('mousemove', this.handleMouseMove);
+                    this.mapDiv.removeEventListener('click', this.handleClick);
+                    this.mapDiv = null;
+                }
             }
+
+            findUserAtPixel(x, y) {
+                const projection = this.getProjection();
+                if (!projection || !this.props.quadtree) return null;
+
+                // We need the canvas's top-left corner in pixel coordinates to adjust the mouse position
+                const bounds = this.getMap().getBounds();
+                if (!bounds) return null;
+                const sw = projection.fromLatLngToDivPixel(bounds.getSouthWest());
+
+                // Adjust mouse coordinates to be absolute within the map div, not just the canvas
+                const absoluteX = x + sw.x;
+                const absoluteY = y + (projection.fromLatLngToDivPixel(bounds.getNorthEast())).y;
+
+
+                // Convert absolute pixel coordinates to LatLng
+                const latLng = projection.fromDivPixelToLatLng(new window.google.maps.Point(absoluteX, absoluteY));
+                if (!latLng) return null;
+
+                // Find the nearest user in the quadtree
+                const searchRadius = 0.05; // Increased radius for better matching
+                const foundUser = this.props.quadtree.find(latLng.lng(), latLng.lat(), searchRadius);
+
+                if (foundUser) {
+                    // Verify if the cursor is actually within the user's marker circle
+                    const userPixel = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(foundUser.lat, foundUser.lng));
+                    const zoom = this.getMap().getZoom();
+                    const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
+                    // Use absolute coordinates for distance check as well
+                    const distance = Math.sqrt(Math.pow(absoluteX - userPixel.x, 2) + Math.pow(absoluteY - userPixel.y, 2));
+
+                    if (distance <= imageSize / 2) {
+                        return foundUser;
+                    }
+                }
+                return null;
+            }
+
+            handleMouseMove(e) {
+                const user = this.findUserAtPixel(e.offsetX, e.offsetY);
+                this.props.onSetHoveredUser(user);
+
+                // Change cursor style based on whether a user is hovered
+                if (user) {
+                    this.getMap().getDiv().style.cursor = 'pointer';
+                } else {
+                    this.getMap().getDiv().style.cursor = '';
+                }
+            }
+
+            handleClick(e) {
+                const user = this.findUserAtPixel(e.offsetX, e.offsetY);
+                if (user) {
+                    this.props.onSetClickedUser(user);
+                    e.stopPropagation(); // Prevent event from bubbling up to the map
+                }
+            }
+
 
             // Main drawing method, called by Google Maps API
             draw() {
@@ -185,7 +303,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 this.ctx.clearRect(0, 0, width, height);
 
                 // Get props for drawing
-                const { users, quadtree, renderedImageCache, isVisible } = this.props;
+                const { users, quadtree, renderedImageCache, isVisible, hoveredUser } = this.props;
                 if (!isVisible || !quadtree) return;
 
                 const zoom = this.getMap().getZoom();
@@ -221,6 +339,8 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                             const drawY = point.y - ne.y;
 
                             if (point) {
+                                const isHovered = hoveredUser && hoveredUser.seq === user.seq;
+
                                 let imageToDraw = renderedImageCache.get(user.avatarUrl);
 
                                 if (imageToDraw) {
@@ -241,14 +361,14 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                                     this.ctx.clip();
                                     this.ctx.drawImage(rawImage, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
                                     this.ctx.restore();
-
-                                    // Draw the border
-                                    this.ctx.beginPath();
-                                    this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
-                                    this.ctx.strokeStyle = 'red';
-                                    this.ctx.lineWidth = 2;
-                                    this.ctx.stroke();
                                 }
+
+                                // Draw the border, with hover effect
+                                this.ctx.beginPath();
+                                this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
+                                this.ctx.strokeStyle = isHovered ? '#007BFF' : 'red';
+                                this.ctx.lineWidth = isHovered ? 6 : 2;
+                                this.ctx.stroke();
                             }
                         } while (p = p.next);
                     }
@@ -274,23 +394,30 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
     // Effect to pass updated React props to the CustomUserOverlay instance
     useEffect(() => {
         if (overlayRef.current) {
-            overlayRef.current.setProps({ users, quadtree, renderedImageCache, isVisible, defaultAvatarRef: defaultAvatarRef.current });
+            overlayRef.current.setProps({
+                users,
+                quadtree,
+                renderedImageCache,
+                isVisible,
+                defaultAvatarRef: defaultAvatarRef.current,
+                hoveredUser,
+                clickedUser,
+                onSetHoveredUser: setHoveredUser,
+                onSetClickedUser: setClickedUser,
+            });
         }
-    }, [users, quadtree, renderedImageCache, isVisible, defaultAvatarRef.current]);
+    }, [users, quadtree, renderedImageCache, isVisible, hoveredUser, clickedUser]);
 
 
     return (
         <>
-            {/* The custom overlay is managed by the useEffect hook and native Google Maps API,
-                so it doesn't render a React component here. */}
-            {/*{isVisible && users.map((user, index) => (*/}
-            {/*    <Marker*/}
-            {/*        key={user.seq || index}*/}
-            {/*        position={{ lat: user.lat, lng: user.lng }}*/}
-            {/*    />*/}
-            {/*))}*/}
+            {/* The custom overlay is managed by the useEffect hook and native Google Maps API */}
+            {clickedUser && (
+                <UserInfoPopup user={clickedUser} onClose={() => setClickedUser(null)} />
+            )}
         </>
     );
 };
+
 
 export default UserMarkersLayer;
