@@ -127,6 +127,8 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 this.canvas = document.createElement('canvas');
                 this.ctx = this.canvas.getContext('2d');
                 this.canvas.style.position = 'absolute';
+                this.canvas.style.left = '0px';
+                this.canvas.style.top = '0px';
                 this.canvas.style.pointerEvents = 'none';
                 this.canvas.style.zIndex = '1'; // Ensure it's above map tiles
                 this.props = {}; // To store React props
@@ -159,11 +161,19 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 const bounds = this.getMap().getBounds();
                 if (!bounds) return;
 
-                const mapDiv = this.getMap().getDiv();
-                const width = mapDiv.clientWidth;
-                const height = mapDiv.clientHeight;
+                // Convert the map's geographical bounds to pixel coordinates
+                const sw = projection.fromLatLngToDivPixel(bounds.getSouthWest());
+                const ne = projection.fromLatLngToDivPixel(bounds.getNorthEast());
 
-                // Ensure canvas internal resolution and CSS size match map viewport
+                // Calculate the dimensions and position for the canvas
+                const width = ne.x - sw.x;
+                const height = sw.y - ne.y;
+
+                // Position the canvas to perfectly cover the visible map area
+                this.canvas.style.left = `${sw.x}px`;
+                this.canvas.style.top = `${ne.y}px`;
+
+                // Ensure canvas internal resolution and CSS size match the viewport
                 if (this.canvas.width !== width || this.canvas.height !== height) {
                     this.canvas.width = width;
                     this.canvas.height = height;
@@ -184,17 +194,15 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 if (!isVisible || !quadtree) return;
 
                 const zoom = this.getMap().getZoom();
-                const ne = bounds.getNorthEast();
-                const sw = bounds.getSouthWest();
-                const latSpan = Math.abs(ne.lat() - sw.lat());
-                const lngSpan = Math.abs(ne.lng() - sw.lng());
+                const latSpan = Math.abs(bounds.getNorthEast().lat() - bounds.getSouthWest().lat());
+                const lngSpan = Math.abs(bounds.getNorthEast().lng() - bounds.getSouthWest().lng());
 
                 // Calculate extended bounds for quadtree query (buffer zone)
                 const extendedBounds = {
-                    x0: sw.lng() - lngSpan * 0.25,
-                    y0: sw.lat() - latSpan * 0.25,
-                    x1: ne.lng() + lngSpan * 0.25,
-                    y1: ne.lat() + latSpan * 0.25,
+                    x0: bounds.getSouthWest().lng() - lngSpan * 0.25,
+                    y0: bounds.getSouthWest().lat() - latSpan * 0.25,
+                    x1: bounds.getNorthEast().lng() + lngSpan * 0.25,
+                    y1: bounds.getNorthEast().lat() + latSpan * 0.25,
                 };
 
                 const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
@@ -213,12 +221,16 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                             const user = p.data;
                             const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
 
+                            // We need to adjust the drawing coordinates to be relative to our canvas
+                            const drawX = point.x - sw.x;
+                            const drawY = point.y - ne.y;
+
                             if (point) {
                                 let imageToDraw = renderedImageCache.get(user.avatarUrl);
 
                                 if (imageToDraw) {
                                     // --- Fast Path: Use the pre-rendered cache ---
-                                    this.ctx.drawImage(imageToDraw, point.x - imageSize / 2, point.y - imageSize / 2, imageSize, imageSize);
+                                    this.ctx.drawImage(imageToDraw, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
                                 } else {
                                     // --- Fallback Path: Draw manually if not cached yet ---
                                     const cacheEntry = imageCache.get(user.avatarUrl);
@@ -230,14 +242,14 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                                     // Draw the raw image manually with circle clipping
                                     this.ctx.save();
                                     this.ctx.beginPath();
-                                    this.ctx.arc(point.x, point.y, imageSize / 2, 0, Math.PI * 2, true);
+                                    this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
                                     this.ctx.clip();
-                                    this.ctx.drawImage(rawImage, point.x - imageSize / 2, point.y - imageSize / 2, imageSize, imageSize);
+                                    this.ctx.drawImage(rawImage, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
                                     this.ctx.restore();
 
                                     // Draw the border
                                     this.ctx.beginPath();
-                                    this.ctx.arc(point.x, point.y, imageSize / 2, 0, Math.PI * 2, true);
+                                    this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
                                     this.ctx.strokeStyle = 'red';
                                     this.ctx.lineWidth = 2;
                                     this.ctx.stroke();
