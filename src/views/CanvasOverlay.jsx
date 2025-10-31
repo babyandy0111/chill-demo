@@ -22,132 +22,41 @@ const createNoisePattern = () => {
     return ctx.createPattern(canvas, 'repeat');
 };
 
+
 const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, isAnimating, selectedCell, effects }) => {
     const overlayRef = useRef(null);
     const workerRef = useRef(null);
-    const [drawableClaimedCells, setDrawableClaimedCells] = useState([]);
-    const [drawableExploredCells, setDrawableExploredCells] = useState([]);
-    const claimedCellsRef = useRef(claimedCells);
-    const exploredCellsRef = useRef(exploredCells);
-    const noisePatternRef = useRef(null);
+    const [drawableCells, setDrawableCells] = useState({ claimed: [], explored: [] });
     const animationFrameRef = useRef();
+    const noisePatternRef = useRef(null);
 
-    useEffect(() => {
-        claimedCellsRef.current = claimedCells;
-    }, [claimedCells]);
-
-    useEffect(() => {
-        exploredCellsRef.current = exploredCells;
-    }, [exploredCells]);
-
-    useEffect(() => {
-        noisePatternRef.current = createNoisePattern(); // Create pattern once
-        const worker = new Worker(new URL('./grid.worker.js', import.meta.url), { type: 'module' });
-        workerRef.current = worker;
-        worker.onmessage = (e) => {
-            const { claimedCellsToDraw, exploredCellsToDraw } = e.data;
-            setDrawableClaimedCells(claimedCellsToDraw);
-            setDrawableExploredCells(exploredCellsToDraw);
-        };
-
-        return () => {
-            worker.terminate();
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
-            }
-        };
-    }, []);
-
-    useEffect(() => {
-        const overlay = overlayRef.current;
-        if (!overlay) return;
-
-        // A map to track which effects have had their onComplete callback triggered
-        const completedEffects = new Map();
-
-        const animate = () => {
-            const projection = overlay.getProjection();
-            if (!projection || !overlay.swPixel) {
-                animationFrameRef.current = requestAnimationFrame(animate);
-                return;
-            }
-
-            // Clear the particle canvas for this frame
-            overlay.effectsCtx.clearRect(0, 0, overlay.effectsCanvas.width, overlay.effectsCanvas.height);
-            
-            // Redraw the static fog before drawing animated reveals
-            overlay.drawFog();
-
-            let hasActiveAnimations = false;
-            const now = Date.now();
-
-            effects.forEach(effect => {
-                const elapsedTime = now - effect.startTime;
-                
-                // --- Particle Animation ---
-                if (elapsedTime < effect.particleDuration) {
-                    hasActiveAnimations = true;
-                    const particleProgress = elapsedTime / effect.particleDuration;
-                    overlay.drawParticleEffect(effect, particleProgress, projection);
-                }
-
-                // --- Reveal Animation ---
-                if (elapsedTime < effect.revealDuration) {
-                    hasActiveAnimations = true;
-                    const revealProgress = elapsedTime / effect.revealDuration;
-                    overlay.drawRevealEffect(effect, revealProgress, projection);
-                }
-
-                // --- Completion Callback ---
-                if (elapsedTime >= effect.revealDuration && !completedEffects.has(effect.id)) {
-                    if (effect.onComplete) {
-                        effect.onComplete();
-                    }
-                    completedEffects.set(effect.id, true);
-                }
-            });
-
-            if (hasActiveAnimations) {
-                animationFrameRef.current = requestAnimationFrame(animate);
-            } else {
-                // If no more animations, ensure the fog is in its final state
-                overlay.drawFog();
-            }
-        };
-
-        animationFrameRef.current = requestAnimationFrame(animate);
-
-        return () => {
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
-            }
-            // Final redraw to ensure state is clean
-            if (overlay) {
-                overlay.clearEffects();
-                overlay.drawFog();
-            }
-        };
-    }, [effects]);
-
+    // Effect for Initialization: Runs only when the map instance is ready.
     useEffect(() => {
         if (!map) return;
 
-        class FinalCanvasOverlay extends window.google.maps.OverlayView {
-            constructor() {
+        // --- Google Maps OverlayView Class ---
+        // This class is defined inside useEffect to ensure window.google.maps is loaded before trying to extend OverlayView.
+        class GoogleMapsCustomOverlay extends window.google.maps.OverlayView {
+            constructor(noisePattern) {
                 super();
                 this.props = {};
                 this.swPixel = null;
                 this.nePixel = null;
                 this.drawableClaimed = [];
                 this.drawableExplored = [];
+                this.noisePattern = noisePattern;
+
+                // Create canvases
                 this.fogCanvas = document.createElement('canvas');
                 this.fogCtx = this.fogCanvas.getContext('2d');
                 this.fogCanvas.style.position = 'absolute';
                 this.fogCanvas.style.pointerEvents = 'none';
+
                 this.effectsCanvas = document.createElement('canvas');
                 this.effectsCtx = this.effectsCanvas.getContext('2d');
                 this.effectsCanvas.style.position = 'absolute';
                 this.effectsCanvas.style.pointerEvents = 'none';
+
                 this.dynamicCanvas = document.createElement('canvas');
                 this.dynamicCtx = this.dynamicCanvas.getContext('2d');
                 this.dynamicCanvas.style.position = 'absolute';
@@ -181,6 +90,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
             draw() {
                 const projection = this.getProjection();
                 if (!projection) return;
+
                 const OVERSCAN_FACTOR = 0.5;
                 const bounds = this.getMap().getBounds();
                 const sw = bounds.getSouthWest();
@@ -211,7 +121,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 this.drawDynamic();
             }
 
-            // drawFog now only draws the permanent, explored areas
             drawFog() {
                 if (!this.swPixel) return;
 
@@ -220,21 +129,16 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 this.fogCtx.fillStyle = 'rgba(26, 26, 26, 0.9)';
                 this.fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
 
-                if (noisePatternRef.current) {
-                    this.fogCtx.fillStyle = noisePatternRef.current;
+                if (this.noisePattern) {
+                    this.fogCtx.fillStyle = this.noisePattern;
                     this.fogCtx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
                 }
-                
+
                 this.fogCtx.globalCompositeOperation = 'destination-out';
-
-                this.drawableExplored.forEach(cell => {
-                    this.drawStaticReveal(cell);
-                });
-
+                this.drawableExplored.forEach(cell => this.drawStaticReveal(cell));
                 this.fogCtx.globalCompositeOperation = 'source-over';
             }
 
-            // Helper for drawing a static revealed area
             drawStaticReveal(cell) {
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
@@ -255,16 +159,17 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const centerY = rectY + rectHeight / 2;
                 const radiusX = rectWidth * 2.5;
                 const radiusY = rectHeight * 2.5;
+
                 const gradient = this.fogCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(radiusX, radiusY));
                 gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
                 gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
                 this.fogCtx.fillStyle = gradient;
                 this.fogCtx.beginPath();
                 this.fogCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
                 this.fogCtx.fill();
             }
 
-            // New method for drawing the animated reveal effect
             drawRevealEffect(effect, progress, projection) {
                 const centerLatLng = new window.google.maps.LatLng(effect.position.lat, effect.position.lng);
                 const centerPixel = projection.fromLatLngToDivPixel(centerLatLng);
@@ -273,7 +178,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const x = centerPixel.x - this.swPixel.x;
                 const y = centerPixel.y - this.nePixel.y;
 
-                // Use a dummy grid cell to calculate pixel width for sizing
                 const dummySW = new window.google.maps.LatLng(effect.position.lat, effect.position.lng);
                 const dummyNE = new window.google.maps.LatLng(effect.position.lat + GRID_SIZE, effect.position.lng + GRID_SIZE);
                 const pixelSW = projection.fromLatLngToDivPixel(dummySW);
@@ -282,7 +186,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const rectWidth = pixelNE.x - pixelSW.x;
 
                 const maxRadius = rectWidth * 2.5;
-                const currentRadius = maxRadius * progress; // Radius grows with progress
+                const currentRadius = maxRadius * progress;
 
                 const gradient = this.fogCtx.createRadialGradient(x, y, 0, x, y, currentRadius);
                 gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
@@ -296,7 +200,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 this.fogCtx.globalCompositeOperation = 'source-over';
             }
 
-            // Renamed from drawEffects to be more specific
             drawParticleEffect(effect, progress, projection) {
                 const centerLatLng = new window.google.maps.LatLng(effect.position.lat, effect.position.lng);
                 const centerPixel = projection.fromLatLngToDivPixel(centerLatLng);
@@ -336,7 +239,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 this.dynamicCtx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
 
                 const cellToHighlight = selectedCell ? selectedCell.key : hoveredCell;
-
                 if (!cellToHighlight) return;
 
                 const [iy, ix] = cellToHighlight.split('_').map(Number);
@@ -359,13 +261,24 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
             }
         }
 
-        const overlay = new FinalCanvasOverlay();
+        // 1. Initialize Overlay and Worker
+        noisePatternRef.current = createNoisePattern();
+        const overlay = new GoogleMapsCustomOverlay(noisePatternRef.current);
         overlay.setMap(map);
         overlayRef.current = overlay;
 
+        const worker = new Worker(new URL('./grid.worker.js', import.meta.url), { type: 'module' });
+        workerRef.current = worker;
+
+        // 2. Setup Worker Message Handling
+        worker.onmessage = (e) => {
+            const { claimedCellsToDraw, exploredCellsToDraw } = e.data;
+            setDrawableCells({ claimed: claimedCellsToDraw, explored: exploredCellsToDraw });
+        };
+
+        // 3. Setup Map Event Listeners
         let throttleTimeout = null;
         const THROTTLE_MS = 100;
-
         const updateGrid = () => {
             if (workerRef.current) {
                 const bounds = map.getBounds();
@@ -376,8 +289,8 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                             northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
                         },
                         zoom: map.getZoom(),
-                        claimedCells: claimedCellsRef.current,
-                        exploredCells: exploredCellsRef.current
+                        claimedCells: claimedCells, // Pass current props directly
+                        exploredCells: exploredCells
                     });
                 }
             }
@@ -392,47 +305,89 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
         });
 
         const idleListener = map.addListener('idle', updateGrid);
-
+        
+        // 4. Cleanup
         return () => {
-            if (overlayRef.current) {
-                overlayRef.current.setMap(null);
-            }
+            worker.terminate();
+            overlay.setMap(null);
             window.google.maps.event.removeListener(boundsListener);
             window.google.maps.event.removeListener(idleListener);
-            if (throttleTimeout) {
-                clearTimeout(throttleTimeout);
-            }
+            if (throttleTimeout) clearTimeout(throttleTimeout);
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
         };
-    }, [map]);
+    }, [map, claimedCells, exploredCells]); // Dependency on map ensures this runs once when map is ready
 
+    // Effect for Drawing Updates: Passes drawable cells from state to the overlay instance.
+    useEffect(() => {
+        if (!overlayRef.current) return;
+        overlayRef.current.setDrawableCells(drawableCells.claimed, drawableCells.explored);
+        overlayRef.current.drawFog();
+    }, [drawableCells]);
+
+    // Effect for Dynamic Props: Updates props for hover/selection without recalculating grid.
     useEffect(() => {
         if (!overlayRef.current) return;
         overlayRef.current.setProps({ zoom, hoveredCell, isAnimating, selectedCell });
         overlayRef.current.drawDynamic();
-        // drawFog is now called inside the animation loop to composite correctly
     }, [zoom, hoveredCell, isAnimating, selectedCell]);
 
+    // Effect for Animations: Manages the animation loop for special effects.
     useEffect(() => {
-        if (!overlayRef.current) return;
-        overlayRef.current.setDrawableCells(drawableClaimedCells, drawableExploredCells);
-        overlayRef.current.drawFog(); // Initial draw
-    }, [drawableClaimedCells, drawableExploredCells]);
+        const overlay = overlayRef.current;
+        if (!overlay || effects.length === 0) return;
 
-    useEffect(() => {
-        if (!map || !workerRef.current) return;
-        const bounds = map.getBounds();
-        if (bounds) {
-            workerRef.current.postMessage({
-                bounds: {
-                    southwest: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() },
-                    northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
-                },
-                zoom: map.getZoom(),
-                claimedCells: claimedCells,
-                exploredCells: exploredCells
+        const completedEffects = new Map();
+        const animate = () => {
+            const projection = overlay.getProjection();
+            if (!projection || !overlay.swPixel) {
+                animationFrameRef.current = requestAnimationFrame(animate);
+                return;
+            }
+
+            overlay.effectsCtx.clearRect(0, 0, overlay.effectsCanvas.width, overlay.effectsCanvas.height);
+            overlay.drawFog(); // Redraw base fog
+
+            let hasActiveAnimations = false;
+            const now = Date.now();
+
+            effects.forEach(effect => {
+                const elapsedTime = now - effect.startTime;
+
+                if (elapsedTime < effect.particleDuration) {
+                    hasActiveAnimations = true;
+                    overlay.drawParticleEffect(effect, elapsedTime / effect.particleDuration, projection);
+                }
+
+                if (elapsedTime < effect.revealDuration) {
+                    hasActiveAnimations = true;
+                    overlay.drawRevealEffect(effect, elapsedTime / effect.revealDuration, projection);
+                }
+
+                if (elapsedTime >= effect.revealDuration && !completedEffects.has(effect.id)) {
+                    effect.onComplete?.();
+                    completedEffects.set(effect.id, true);
+                }
             });
-        }
-    }, [claimedCells, exploredCells, map]);
+
+            if (hasActiveAnimations) {
+                animationFrameRef.current = requestAnimationFrame(animate);
+            } else {
+                overlay.drawFog(); // Ensure final state
+            }
+        };
+
+        animationFrameRef.current = requestAnimationFrame(animate);
+
+        return () => {
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+            }
+            if (overlay) {
+                overlay.clearEffects();
+                overlay.drawFog();
+            }
+        };
+    }, [effects]);
 
     return null;
 };
