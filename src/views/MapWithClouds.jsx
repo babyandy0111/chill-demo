@@ -1,4 +1,5 @@
 import React, {useState, useCallback, useEffect, useRef} from "react";
+import { createPortal } from 'react-dom';
 import {GoogleMap} from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 import CellInfoWindow from "../components/CellInfoWindow.jsx";
@@ -6,7 +7,6 @@ import CurrentUserLocationMarker from "../components/CurrentUserLocationMarker.j
 import { smoothAnimate } from "../map-animation.js"; // Import the smooth animation function
 
 const GRID_SIZE = 0.0005;
-
 const mapContainerStyle = {width: "100%", height: "100%"};
 const mapRootStyle = {
     position: 'absolute', inset: '0px', width: '100%', height: '100%',
@@ -39,6 +39,8 @@ const MapWithClouds = ({
     const wheelThrottleTimeout = useRef(null);
     const WHEEL_THROTTLE_MS = 150; // Throttle wheel events
     const [isAnimating, setIsAnimating] = useState(false); // New state for animation status
+    const [effects, setEffects] = useState([]);
+
 
     const handleMapLoad = useCallback((map) => {
         setMapInstance(map);
@@ -98,6 +100,20 @@ const MapWithClouds = ({
             onSelectCell(null, null);
             return;
         }
+
+        // --- React-style effect creation ---
+        const newEffect = {
+            id: Date.now() + Math.random(), // Unique ID for the effect
+            size: Math.random() * 100 + 80,
+            x: e.domEvent.clientX,
+            y: e.domEvent.clientY,
+        };
+
+        setEffects(currentEffects => [...currentEffects, newEffect]);
+        setTimeout(() => {
+            setEffects(currentEffects => currentEffects.filter(effect => effect.id !== newEffect.id));
+        }, 5000); // Corresponds to animation duration
+
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
         const iy = Math.floor(lat / GRID_SIZE);
@@ -132,6 +148,21 @@ const MapWithClouds = ({
 
     return (
         <div className="view-container fade-in" style={mapRootStyle} onWheel={handleWheel}>
+            {createPortal(
+                effects.map(effect => (
+                    <div
+                        key={effect.id}
+                        className="effect-3-particle"
+                        style={{
+                            width: `${effect.size}px`,
+                            height: `${effect.size}px`,
+                            left: `${effect.x - effect.size / 2}px`,
+                            top: `${effect.y - effect.size / 2}px`,
+                        }}
+                    />
+                )),
+                document.body
+            )}
             <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={center}
@@ -171,5 +202,4 @@ const MapWithClouds = ({
         </div>
     );
 };
-
 export default React.memo(MapWithClouds);

@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import cloudImageSrc from '../assets/cloud.png';
 
 const GRID_SIZE = 0.0005;
-const cloudImage = new Image();
-cloudImage.src = cloudImageSrc;
 
 // --- Helper function to create a noise pattern ---
 const createNoisePattern = () => {
@@ -78,17 +75,10 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 this.fogCanvas.style.pointerEvents = 'none';
                 this.fogCanvas.style.transition = 'opacity 0.3s ease-in-out'; // Smooth transition for opacity
 
-                this.cloudsCanvas = document.createElement('canvas');
-                this.cloudsCtx = this.cloudsCanvas.getContext('2d');
-                this.cloudsCanvas.style.position = 'absolute';
-                this.cloudsCanvas.style.pointerEvents = 'none';
-
                 this.dynamicCanvas = document.createElement('canvas');
                 this.dynamicCtx = this.dynamicCanvas.getContext('2d');
                 this.dynamicCanvas.style.position = 'absolute';
                 this.dynamicCanvas.style.pointerEvents = 'none';
-
-                cloudImage.onload = () => this.drawClouds();
             }
 
             setProps(props) {
@@ -103,12 +93,11 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
             onAdd() {
                 const panes = this.getPanes();
                 panes.overlayLayer.appendChild(this.fogCanvas);
-                panes.overlayMouseTarget.appendChild(this.cloudsCanvas);
                 panes.overlayMouseTarget.appendChild(this.dynamicCanvas);
             }
 
             onRemove() {
-                [this.fogCanvas, this.cloudsCanvas, this.dynamicCanvas].forEach(canvas => {
+                [this.fogCanvas, this.dynamicCanvas].forEach(canvas => {
                     if (canvas.parentElement) {
                         canvas.parentElement.removeChild(canvas);
                     }
@@ -143,7 +132,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 this.nePixel = { x: nePixelOriginal.x + overscanWidth, y: nePixelOriginal.y - overscanHeight };
 
 
-                [this.fogCanvas, this.cloudsCanvas, this.dynamicCanvas].forEach(canvas => {
+                [this.fogCanvas, this.dynamicCanvas].forEach(canvas => {
                     canvas.style.left = `${swPixelOriginal.x - overscanWidth}px`;
                     canvas.style.top = `${nePixelOriginal.y - overscanHeight}px`;
                     canvas.width = canvasWidth;
@@ -151,7 +140,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 });
 
                 this.drawFog();
-                this.drawClouds();
                 this.drawDynamic();
             }
 
@@ -207,125 +195,201 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                     this.fogCtx.fill();
                 });
 
-                // 4. Reset composite operation
-                this.fogCtx.globalCompositeOperation = 'source-over';
-            }
+                                // 4. Reset composite operation
 
-            drawClouds() {
-                const projection = this.getProjection();
-                if (!projection || !cloudImage.complete || !this.swPixel) return;
+                                this.fogCtx.globalCompositeOperation = 'source-over';
 
-                this.cloudsCtx.clearRect(0, 0, this.cloudsCanvas.width, this.cloudsCanvas.height);
+                            }
 
-                this.drawableClaimed.forEach(cell => {
-                    const { south, west } = cell;
-                    const pixelSW = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south, west));
-                    const pixelNE = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE));
-                    if (!pixelSW || !pixelNE) return;
-                    this.cloudsCtx.drawImage(cloudImage,
-                        pixelSW.x - this.swPixel.x,
-                        pixelNE.y - this.nePixel.y,
-                        pixelNE.x - pixelSW.x,
-                        pixelSW.y - pixelNE.y
-                    );
-                });
-            }
+                
 
-            drawDynamic() {
-                const projection = this.getProjection();
-                if (!projection || !this.swPixel) return;
+                            drawDynamic() {
 
-                const { hoveredCell, selectedCell } = this.props; // Get selectedCell from props
-                this.dynamicCtx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
+                                const projection = this.getProjection();
 
-                // Prioritize selectedCell for highlighting
-                const cellToHighlight = selectedCell ? selectedCell.key : hoveredCell;
+                                if (!projection || !this.swPixel) return;
 
-                if (!cellToHighlight) return;
+                
 
-                const [iy, ix] = cellToHighlight.split('_').map(Number);
-                const south = iy * GRID_SIZE;
-                const west = ix * GRID_SIZE;
-                const cellSW = new window.google.maps.LatLng(south, west);
-                const cellNE = new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE);
-                const pixelSW = projection.fromLatLngToDivPixel(cellSW);
-                const pixelNE = projection.fromLatLngToDivPixel(cellNE);
+                                const { hoveredCell, selectedCell } = this.props; // Get selectedCell from props
 
-                if (!pixelSW || !pixelNE) return;
+                                this.dynamicCtx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
 
-                const rectX = pixelSW.x - this.swPixel.x;
-                const rectY = pixelNE.y - this.nePixel.y;
-                const rectWidth = pixelNE.x - pixelSW.x;
-                const rectHeight = pixelSW.y - pixelNE.y;
+                
 
-                this.dynamicCtx.fillStyle = 'rgba(59, 130, 246, 0.4)';
-                this.dynamicCtx.fillRect(rectX, rectY, rectWidth, rectHeight);
-            }
-        }
+                                // Prioritize selectedCell for highlighting
 
-        const overlay = new FinalCanvasOverlay();
-        overlay.setMap(map);
-        overlayRef.current = overlay;
+                                const cellToHighlight = selectedCell ? selectedCell.key : hoveredCell;
 
-        let throttleTimeout = null;
-        const THROTTLE_MS = 100;
+                
 
-        const updateGrid = () => {
-            if (workerRef.current) {
-                const bounds = map.getBounds();
-                if (bounds) {
-                    workerRef.current.postMessage({
-                        bounds: {
-                            southwest: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() },
-                            northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
-                        },
-                        zoom: map.getZoom(),
-                        claimedCells: claimedCellsRef.current,
-                        exploredCells: exploredCellsRef.current
-                    });
-                }
-            }
-        };
+                                if (!cellToHighlight) return;
 
-        const boundsListener = map.addListener('bounds_changed', () => {
-            if (throttleTimeout) return;
-            throttleTimeout = setTimeout(() => {
-                updateGrid();
-                throttleTimeout = null;
-            }, THROTTLE_MS);
-        });
+                
 
-        const idleListener = map.addListener('idle', updateGrid);
+                                const [iy, ix] = cellToHighlight.split('_').map(Number);
 
-        return () => {
-            if (overlayRef.current) {
-                overlayRef.current.setMap(null);
-            }
-            window.google.maps.event.removeListener(boundsListener);
-            window.google.maps.event.removeListener(idleListener);
-            if (throttleTimeout) {
-                clearTimeout(throttleTimeout);
-            }
-        };
-    }, [map]);
+                                const south = iy * GRID_SIZE;
 
-    useEffect(() => {
-        if (!overlayRef.current) return;
-        overlayRef.current.setProps({ zoom, hoveredCell, isAnimating, selectedCell });
-        overlayRef.current.drawDynamic();
-        overlayRef.current.drawFog();
-    }, [zoom, hoveredCell, isAnimating, selectedCell]);
+                                const west = ix * GRID_SIZE;
 
-    useEffect(() => {
-        if (!overlayRef.current) return;
-        overlayRef.current.setDrawableCells(drawableClaimedCells, drawableExploredCells);
-        overlayRef.current.drawFog();
-        overlayRef.current.drawClouds();
-    }, [drawableClaimedCells, drawableExploredCells]);
+                                const cellSW = new window.google.maps.LatLng(south, west);
 
-    useEffect(() => {
-        if (!map || !workerRef.current) return;
-        const bounds = map.getBounds();
+                                const cellNE = new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE);
+
+                                const pixelSW = projection.fromLatLngToDivPixel(cellSW);
+
+                                const pixelNE = projection.fromLatLngToDivPixel(cellNE);
+
+                
+
+                                if (!pixelSW || !pixelNE) return;
+
+                
+
+                                const rectX = pixelSW.x - this.swPixel.x;
+
+                                const rectY = pixelNE.y - this.nePixel.y;
+
+                                const rectWidth = pixelNE.x - pixelSW.x;
+
+                                const rectHeight = pixelSW.y - pixelNE.y;
+
+                
+
+                                this.dynamicCtx.fillStyle = 'rgba(59, 130, 246, 0.4)';
+
+                                this.dynamicCtx.fillRect(rectX, rectY, rectWidth, rectHeight);
+
+                            }
+
+                        }
+
+                
+
+                        const overlay = new FinalCanvasOverlay();
+
+                        overlay.setMap(map);
+
+                        overlayRef.current = overlay;
+
+                
+
+                        let throttleTimeout = null;
+
+                        const THROTTLE_MS = 100;
+
+                
+
+                        const updateGrid = () => {
+
+                            if (workerRef.current) {
+
+                                const bounds = map.getBounds();
+
+                                if (bounds) {
+
+                                    workerRef.current.postMessage({
+
+                                        bounds: {
+
+                                            southwest: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() },
+
+                                            northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
+
+                                        },
+
+                                        zoom: map.getZoom(),
+
+                                        claimedCells: claimedCellsRef.current,
+
+                                        exploredCells: exploredCellsRef.current
+
+                                    });
+
+                                }
+
+                            }
+
+                        };
+
+                
+
+                        const boundsListener = map.addListener('bounds_changed', () => {
+
+                            if (throttleTimeout) return;
+
+                            throttleTimeout = setTimeout(() => {
+
+                                updateGrid();
+
+                                throttleTimeout = null;
+
+                            }, THROTTLE_MS);
+
+                        });
+
+                
+
+                        const idleListener = map.addListener('idle', updateGrid);
+
+                
+
+                        return () => {
+
+                            if (overlayRef.current) {
+
+                                overlayRef.current.setMap(null);
+
+                            }
+
+                            window.google.maps.event.removeListener(boundsListener);
+
+                            window.google.maps.event.removeListener(idleListener);
+
+                            if (throttleTimeout) {
+
+                                clearTimeout(throttleTimeout);
+
+                            }
+
+                        };
+
+                    }, [map]);
+
+                
+
+                    useEffect(() => {
+
+                        if (!overlayRef.current) return;
+
+                        overlayRef.current.setProps({ zoom, hoveredCell, isAnimating, selectedCell });
+
+                        overlayRef.current.drawDynamic();
+
+                        overlayRef.current.drawFog();
+
+                    }, [zoom, hoveredCell, isAnimating, selectedCell]);
+
+                
+
+                    useEffect(() => {
+
+                        if (!overlayRef.current) return;
+
+                        overlayRef.current.setDrawableCells(drawableClaimedCells, drawableExploredCells);
+
+                        overlayRef.current.drawFog();
+
+                    }, [drawableClaimedCells, drawableExploredCells]);
+
+                
+
+                    useEffect(() => {
+
+                        if (!map || !workerRef.current) return;
+
+                        const bounds = map.getBounds();
         if (bounds) {
             workerRef.current.postMessage({
                 bounds: {
