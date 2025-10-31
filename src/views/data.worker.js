@@ -20,7 +20,7 @@ function parseCSV(csvText) {
     }
 
     for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(/,(?=(?:(?:[^\"]*\"){2})*[^\"]*$)/);
+        const values = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
 
         if (values.length === headers.length) {
             const lat = parseFloat(values[latIndex]);

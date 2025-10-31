@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import { OverlayView } from '@react-google-maps/api';
 import { quadtree as d3_quadtree } from 'd3-quadtree';
 
@@ -76,36 +76,9 @@ const UserInfoPopup = ({ user, onClose }) => {
 const UserMarkersLayer = ({ map, users, isVisible }) => {
     const overlayRef = useRef(null); // Ref for our custom OverlayView instance
     const imageCache = useRef(new Map()).current; // Cache for raw Image objects
-    const renderedImageCache = useRef(new Map()).current; // Cache for pre-rendered circled images
     const defaultAvatarRef = useRef(null);
     const [hoveredUser, setHoveredUser] = useState(null);
     const [clickedUser, setClickedUser] = useState(null); // Reintroduce local state
-
-    // Helper function to create a pre-rendered circled image with a border
-    const createCircledImage = useCallback((image, size, borderColor, borderWidth) => {
-        const offscreenCanvas = document.createElement('canvas');
-        const context = offscreenCanvas.getContext('2d');
-        offscreenCanvas.width = size;
-        offscreenCanvas.height = size;
-
-        // Draw the circular clip
-        context.beginPath();
-        context.arc(size / 2, size / 2, size / 2 - borderWidth / 2, 0, Math.PI * 2, true);
-        context.clip();
-
-        // Draw the image
-        context.drawImage(image, 0, 0, size, size);
-
-        // Draw the border
-        context.beginPath();
-        context.arc(size / 2, size / 2, size / 2 - borderWidth / 2, 0, Math.PI * 2, true);
-        context.strokeStyle = borderColor;
-        context.lineWidth = borderWidth;
-        context.stroke();
-
-        return offscreenCanvas;
-    }, []);
-
 
     // Ensure default avatar is created once
     if (!defaultAvatarRef.current) {
@@ -138,21 +111,15 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
 
                 img.onload = () => {
                     cacheEntry.loaded = true;
-                    // Pre-render the image and store it in the rendered cache
-                    const renderedAvatar = createCircledImage(img, 128, 'red', 4); // Use a larger size for quality
-                    renderedImageCache.set(user.avatarUrl, renderedAvatar);
                 };
                 img.onerror = () => {
                     console.warn(`Failed to load image: ${user.avatarUrl}`);
                     cacheEntry.loaded = 'error';
                     cacheEntry.image = defaultAvatarRef.current;
-                    // Pre-render and cache the default avatar as well
-                    const renderedDefault = createCircledImage(defaultAvatarRef.current, 128, 'red', 4);
-                    renderedImageCache.set('default', renderedDefault);
                 };
             }
         });
-    }, [users, imageCache, renderedImageCache, createCircledImage]);
+    }, [users, imageCache]);
 
 
     // Main effect to manage the custom Google Maps OverlayView
@@ -304,7 +271,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
             }
 
             drawSingleMarker(user, projection, sw, ne) {
-                const { renderedImageCache, hoveredUser, imageCache, defaultAvatarRef } = this.props;
+                const { hoveredUser, imageCache, defaultAvatarRef } = this.props;
                 const point = projection.fromLatLngToDivPixel(new window.google.maps.LatLng(user.lat, user.lng));
                 if (!point) return;
 
@@ -315,24 +282,22 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
                 const isHovered = hoveredUser && hoveredUser.seq === user.seq;
 
-                let imageToDraw = renderedImageCache.get(user.avatarUrl);
-
-                if (imageToDraw) {
-                    this.ctx.drawImage(imageToDraw, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
-                } else {
-                    const cacheEntry = imageCache.get(user.avatarUrl);
-                    let rawImage = defaultAvatarRef.current;
-                    if (cacheEntry && cacheEntry.loaded === true) {
-                        rawImage = cacheEntry.image;
-                    }
-                    if (!rawImage) return; // Do not draw if image is not available yet
-                    this.ctx.save();
-                    this.ctx.beginPath();
-                    this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
-                    this.ctx.clip();
-                    this.ctx.drawImage(rawImage, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
-                    this.ctx.restore();
+                const cacheEntry = imageCache.get(user.avatarUrl);
+                let imageToDraw = defaultAvatarRef.current; // Default to placeholder
+                if (cacheEntry && cacheEntry.loaded === true) {
+                    imageToDraw = cacheEntry.image;
                 }
+
+                if (!imageToDraw) return; // Don't draw if the default isn't even ready
+
+                // --- Real-time circular drawing ---
+                this.ctx.save();
+                this.ctx.beginPath();
+                this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
+                this.ctx.clip();
+                this.ctx.drawImage(imageToDraw, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
+                this.ctx.restore();
+                // --- End of real-time circular drawing ---
 
                 this.ctx.beginPath();
                 this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
@@ -458,7 +423,6 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
             overlayRef.current.setProps({
                 users,
                 quadtree,
-                renderedImageCache,
                 imageCache,
                 isVisible,
                 defaultAvatarRef: defaultAvatarRef.current,
@@ -468,7 +432,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 onSetClickedUser: setClickedUser,
             });
         }
-    }, [users, quadtree, renderedImageCache, isVisible, hoveredUser, clickedUser, imageCache]);
+    }, [users, quadtree, isVisible, hoveredUser, clickedUser, imageCache]);
 
 
     return (
