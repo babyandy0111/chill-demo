@@ -82,6 +82,11 @@ const GlobeView = () => {
                     () => {
                         // Failure: User denied or error occurred. Fallback to auto-rotation.
                         globeEl.current.controls().autoRotate = true;
+                    },
+                    {
+                        enableHighAccuracy: true, // 啟用高精確度模式
+                        timeout: 10000,           // 設定超時時間為 10 秒
+                        maximumAge: 0             // 不使用緩存的舊位置
                     }
                 );
             }

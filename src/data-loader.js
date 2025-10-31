@@ -67,7 +67,7 @@ export function fetchUserLocations() {
         })
         .then(csvText => {
             const parsedUsers = parseCSV(csvText);
-            const limitedUsers = parsedUsers.slice(0, 10000);
+            const limitedUsers = parsedUsers.slice(0, 500);
             return limitedUsers;
         })
         .catch(error => {
