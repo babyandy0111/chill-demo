@@ -8,16 +8,15 @@ export const useAppStore = create(
     immer((set, get) => ({
         // --- STATE ---
         clouds: 10,
-        claimedCells: {},
-        exploredCells: {},
+        claimedCells: [], // FIX: Initial state must be an array
+        exploredCells: [], // FIX: Initial state must be an array
         selectedCell: null,
         userLocation: null,
         isHydrated: false,
-        lastCloudIncrease: Date.now(), // Track the timestamp of the last cloud increase
+        lastCloudIncrease: Date.now(),
 
         // --- ACTIONS ---
 
-        // Hydrate the store from IndexedDB
         hydrate: async () => {
             try {
                 const [exploredCellsArray, claimedCellsArray, cloudsState, lastIncreaseState] = await Promise.all([
@@ -27,19 +26,10 @@ export const useAppStore = create(
                     db.gameState.get('lastCloudIncrease'),
                 ]);
 
-                const exploredCells = {};
-                exploredCellsArray.forEach(cell => {
-                    exploredCells[cell.id] = true;
-                });
-
-                const claimedCells = {};
-                claimedCellsArray.forEach(cell => {
-                    claimedCells[cell.id] = cell.data;
-                });
-
+                // FIX: Directly use the arrays from IndexedDB. Do not convert to objects.
                 set((state) => {
-                    state.exploredCells = exploredCells;
-                    state.claimedCells = claimedCells;
+                    state.exploredCells = exploredCellsArray;
+                    state.claimedCells = claimedCellsArray;
                     state.clouds = cloudsState ? cloudsState.value : 10;
                     state.lastCloudIncrease = lastIncreaseState ? lastIncreaseState.value : Date.now();
                     state.isHydrated = true;
@@ -58,43 +48,39 @@ export const useAppStore = create(
                     state.lastCloudIncrease = now;
                 }
             });
-            // Save to IndexedDB
-            db.gameState.put({ key: 'clouds', value: get().clouds }).catch(e => console.error("Failed to put clouds state:", e));
-            db.gameState.put({ key: 'lastCloudIncrease', value: now }).catch(e => console.error("Failed to put lastCloudIncrease state:", e));
+            db.gameState.put({ key: 'clouds', value: get().clouds });
+            db.gameState.put({ key: 'lastCloudIncrease', value: now });
         },
         
-        // Initializes geolocation tracking
         initializeGeolocation: () => {
             navigator.geolocation.watchPosition(
                 (position) => {
                     const { latitude, longitude } = position.coords;
+                    const exploredCellKeys = new Set(get().exploredCells.map(c => c.id));
+
                     set((state) => {
                         state.userLocation = { lat: latitude, lng: longitude };
-
                         const iy = Math.floor(latitude / GRID_SIZE);
                         const ix = Math.floor(longitude / GRID_SIZE);
-                        const currentExplored = get().exploredCells;
-                        let changed = false;
+                        const cellsToAdd = [];
                         const EXPLORE_RADIUS = 2;
 
-                        const cellsToAdd = [];
                         for (let i = -EXPLORE_RADIUS; i <= EXPLORE_RADIUS; i++) {
                             for (let j = -EXPLORE_RADIUS; j <= EXPLORE_RADIUS; j++) {
                                 if (i * i + j * j <= EXPLORE_RADIUS * EXPLORE_RADIUS) {
                                     const key = `${iy + i}_${ix + j}`;
-                                    if (!currentExplored[key]) {
-                                        state.exploredCells[key] = true;
-                                        cellsToAdd.push({ id: key });
-                                        changed = true;
+                                    if (!exploredCellKeys.has(key)) {
+                                        const newCell = { id: key };
+                                        state.exploredCells.push(newCell); // FIX: Use array.push
+                                        cellsToAdd.push(newCell);
+                                        exploredCellKeys.add(key);
                                     }
                                 }
                             }
                         }
-
-                        if (changed) {
-                            if (cellsToAdd.length > 0) {
-                                db.exploredCells.bulkAdd(cellsToAdd).catch(e => console.error("Failed to bulkAdd explored cells:", e));
-                            }
+                        
+                        if (cellsToAdd.length > 0) {
+                            db.exploredCells.bulkAdd(cellsToAdd).catch(e => console.error("Failed to bulkAdd explored cells:", e));
                         }
                     });
                 },
@@ -103,18 +89,18 @@ export const useAppStore = create(
             );
         },
 
-        // Handles selecting a cell on the map
         selectCell: (cell) => {
             const currentSelected = get().selectedCell;
-            const claimed = get().claimedCells;
-            if (!cell || (currentSelected && currentSelected.key === cell.key) || claimed[cell.key]) {
+            // FIX: Use array.some to check for claimed cells
+            const isClaimed = get().claimedCells.some(c => c.id === cell?.key);
+
+            if (!cell || (currentSelected && currentSelected.key === cell.key) || isClaimed) {
                 set({ selectedCell: null });
             } else {
                 set({ selectedCell: cell });
             }
         },
 
-        // Updates the selected cell with geocoded data
         updateSelectedCellInfo: (data) => {
             set((state) => {
                 if (state.selectedCell) {
@@ -123,24 +109,24 @@ export const useAppStore = create(
             });
         },
 
-        // Handles claiming the currently selected cell
         claimSelectedCell: () => {
-            const { selectedCell, clouds, exploredCells } = get();
+            const { selectedCell, clouds } = get();
             if (!selectedCell) return 'no-cell';
             if (clouds <= 0) return 'no-clouds';
 
             const { key } = selectedCell;
             const cellData = { owner: 'user', color: '#3B82F6' };
+            const newClaimedCell = { id: key, data: cellData };
 
-            // --- Expand vision logic ---
+            const exploredCellKeys = new Set(get().exploredCells.map(c => c.id));
             const [iy, ix] = key.split('_').map(Number);
             const cellsToExplore = [];
-            const EXPLORE_RADIUS = 1; // 3x3 grid (center + 1 radius)
+            const EXPLORE_RADIUS = 1;
 
             for (let i = -EXPLORE_RADIUS; i <= EXPLORE_RADIUS; i++) {
                 for (let j = -EXPLORE_RADIUS; j <= EXPLORE_RADIUS; j++) {
                     const newKey = `${iy + i}_${ix + j}`;
-                    if (!exploredCells[newKey]) {
+                    if (!exploredCellKeys.has(newKey)) {
                         cellsToExplore.push({ id: newKey });
                     }
                 }
@@ -148,28 +134,23 @@ export const useAppStore = create(
 
             set((state) => {
                 state.clouds -= 1;
-                state.claimedCells[key] = cellData;
-                cellsToExplore.forEach(cell => {
-                    state.exploredCells[cell.id] = true;
-                });
+                state.claimedCells.push(newClaimedCell); // FIX: Use array.push
+                state.exploredCells.push(...cellsToExplore); // FIX: Use array spread
                 state.selectedCell = null;
             });
 
-            // --- Save to IndexedDB ---
-            db.claimedCells.put({ id: key, data: cellData }).catch(e => console.error("Failed to put claimed cell:", e));
-            db.gameState.put({ key: 'clouds', value: get().clouds }).catch(e => console.error("Failed to put clouds state:", e));
+            db.claimedCells.put(newClaimedCell);
+            db.gameState.put({ key: 'clouds', value: get().clouds });
             if (cellsToExplore.length > 0) {
-                db.exploredCells.bulkAdd(cellsToExplore).catch(e => console.error("Failed to bulkAdd explored cells:", e));
+                db.exploredCells.bulkAdd(cellsToExplore);
             }
 
             return 'claimed';
         },
 
-        // Resets cloud count, e.g., after registration
         register: () => {
             set({ clouds: 10 });
-            // Save to IndexedDB
-            db.gameState.put({ key: 'clouds', value: 10 }).catch(e => console.error("Failed to put clouds state on register:", e));
+            db.gameState.put({ key: 'clouds', value: 10 });
         },
     }))
 );
