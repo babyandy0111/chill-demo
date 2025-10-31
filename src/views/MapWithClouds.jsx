@@ -72,7 +72,7 @@ const MapWithClouds = ({
     useEffect(() => {
         const runAnimation = async () => {
             if (mapInstance && center && !hasAnimatedRef.current) {
-                await smoothAnimate(mapInstance, center, 2000, 10, setIsAnimating);
+                await smoothAnimate(mapInstance, center, 2000, 20, setIsAnimating); // Change zoom to 20
                 hasAnimatedRef.current = true;
                 handleIdle();
             }
@@ -137,8 +137,23 @@ const MapWithClouds = ({
         onCenterChanged({ lat: newCenter.lat(), lng: newCenter.lng() });
     }, [mapInstance, onCenterChanged]);
 
+    const mapContainerRef = useRef(null); // Ref for the map container div
+
+    useEffect(() => {
+        const mapDiv = mapContainerRef.current;
+        if (!mapDiv) return;
+
+        // Manually add the wheel event listener with passive: false
+        mapDiv.addEventListener('wheel', handleWheel, { passive: false });
+
+        // Cleanup function to remove the event listener
+        return () => {
+            mapDiv.removeEventListener('wheel', handleWheel);
+        };
+    }, [handleWheel]);
+
     return (
-        <div className="view-container fade-in" style={mapRootStyle} onWheel={handleWheel}>
+        <div ref={mapContainerRef} className="view-container fade-in" style={mapRootStyle}>
             <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 100, background: 'rgba(255,255,255,0.7)', padding: '5px 10px', borderRadius: 5 }}>
                 Zoom: {zoom.toFixed(2)}
             </div>

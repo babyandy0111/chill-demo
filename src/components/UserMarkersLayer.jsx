@@ -110,7 +110,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
     useEffect(() => {
         if (!users || users.length === 0) return;
 
-        const placeholderImageUrl = '/vite.svg';
+        const placeholderImageUrl = '/chill-demo/vite.svg';
 
         if (!imageCache.has(placeholderImageUrl)) {
             const img = new Image();
@@ -270,7 +270,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
                 const isHovered = hoveredUser && hoveredUser.seq === user.seq;
 
-                const placeholderImageUrl = '/vite.svg';
+                const placeholderImageUrl = '/chill-demo/vite.svg';
                 let imageToDraw = renderedImageCache.get(placeholderImageUrl) || renderedImageCache.get('default');
 
                 if (imageToDraw) {
