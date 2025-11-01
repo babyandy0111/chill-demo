@@ -34,10 +34,10 @@ const MapWithClouds = ({
                            onZoomOutLimit,
                            effects, // Receive effects as a prop
                        }) => {
-    const [hoveredCell, setHoveredCell] = useState(null);
+
     const [zoom, setZoom] = useState(15);
     const [mapInstance, setMapInstance] = useState(null);
-    const throttleTimeout = useRef(null);
+
     const hasAnimatedRef = useRef(false);
     const wheelThrottleTimeout = useRef(null);
     const WHEEL_THROTTLE_MS = 150;
@@ -82,24 +82,7 @@ const MapWithClouds = ({
         runAnimation();
     }, [mapInstance, center, handleIdle, setIsAnimating]);
 
-    const handleMouseMove = useCallback((e) => {
-        if (throttleTimeout.current) return;
-        throttleTimeout.current = setTimeout(() => {
-            throttleTimeout.current = null;
-            if (zoom < 15) {
-                if (hoveredCell) setHoveredCell(null);
-                return;
-            }
-            const key = `${Math.floor(e.latLng.lat() / GRID_SIZE)}_${Math.floor(e.latLng.lng() / GRID_SIZE)}`;
-            if (key !== hoveredCell) {
-                setHoveredCell(key);
-            }
-        }, 50);
-    }, [zoom, hoveredCell, setHoveredCell]);
 
-    const handleMouseOut = useCallback(() => {
-        setHoveredCell(null);
-    }, [setHoveredCell]);
 
     const handleClick = useCallback((e) => {
         // Effect creation is no longer handled here
@@ -171,8 +154,7 @@ const MapWithClouds = ({
                 onLoad={handleMapLoad}
                 onIdle={handleIdle}
                 onDragEnd={handleDragEnd}
-                onMouseMove={handleMouseMove}
-                onMouseOut={handleMouseOut}
+
                 onClick={handleClick}
             >
                 <CanvasOverlay
@@ -180,7 +162,7 @@ const MapWithClouds = ({
                     zoom={zoom}
                     claimedCells={claimedCells}
                     exploredCells={exploredCells}
-                    hoveredCell={hoveredCell}
+
                     isAnimating={isAnimating}
                     selectedCell={selectedCell}
                     effects={effects} // Pass effects to the canvas

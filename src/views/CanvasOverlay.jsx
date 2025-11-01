@@ -29,6 +29,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
     const [drawableCells, setDrawableCells] = useState({ claimed: [], explored: [] });
     const animationFrameRef = useRef();
     const noisePatternRef = useRef(null);
+    const hoveredCellRef = useRef(null); // New ref for tracking hovered cell
 
     // Effect to notify worker when external data has changed
     useEffect(() => {
@@ -44,7 +45,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
         // --- Google Maps OverlayView Class ---
         // This class is defined inside useEffect to ensure window.google.maps is loaded before trying to extend OverlayView.
         class GoogleMapsCustomOverlay extends window.google.maps.OverlayView {
-            constructor(noisePattern) {
+            constructor(noisePattern, hoveredCellRef) {
                 super();
                 this.props = {};
                 this.swPixel = null;
@@ -52,6 +53,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 this.drawableClaimed = [];
                 this.drawableExplored = [];
                 this.noisePattern = noisePattern;
+                this.hoveredCellRef = hoveredCellRef; // Store the ref
 
                 // Create canvases
                 this.fogCanvas = document.createElement('canvas');
@@ -271,13 +273,14 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
 
-                const { hoveredCell, selectedCell } = this.props;
+                const { selectedCell } = this.props; // Removed hoveredCell from props
                 this.dynamicCtx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
 
                 // --- Draw claimed cells first ---
                 this.drawClaimedCells(projection);
 
-                const cellToHighlight = selectedCell ? selectedCell.key : hoveredCell;
+                // --- Draw hovered cell (from ref) or selected cell ---
+                const cellToHighlight = selectedCell ? selectedCell.key : this.hoveredCellRef.current;
                 if (!cellToHighlight) return;
 
                 const [iy, ix] = cellToHighlight.split('_').map(Number);
@@ -302,7 +305,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
 
         // 1. Initialize Overlay and Worker
         noisePatternRef.current = createNoisePattern();
-        const overlay = new GoogleMapsCustomOverlay(noisePatternRef.current);
+        const overlay = new GoogleMapsCustomOverlay(noisePatternRef.current, hoveredCellRef); // Pass hoveredCellRef
         overlay.setMap(map);
         overlayRef.current = overlay;
 
@@ -333,15 +336,63 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 }
             }
         });
+
+        // --- New: Mouse event listeners for hover effect ---
+        const handleMouseMove = (e) => {
+            if (map.getZoom() < 15) {
+                if (hoveredCellRef.current) {
+                    hoveredCellRef.current = null;
+                }
+                return;
+            }
+            const key = `${Math.floor(e.latLng.lat() / GRID_SIZE)}_${Math.floor(e.latLng.lng() / GRID_SIZE)}`;
+            if (key !== hoveredCellRef.current) {
+                hoveredCellRef.current = key;
+            }
+        };
+
+        const handleMouseOut = () => {
+            if (hoveredCellRef.current) {
+                hoveredCellRef.current = null;
+            }
+        };
+
+        map.addListener('mousemove', handleMouseMove);
+        map.addListener('mouseout', handleMouseOut);
         
         // 4. Cleanup
         return () => {
             worker.terminate();
             overlay.setMap(null);
             window.google.maps.event.removeListener(idleListener);
+            window.google.maps.event.removeListener(handleMouseMove);
+            window.google.maps.event.removeListener(handleMouseOut);
             if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
         };
     }, [map]); // Dependency on map ensures this runs once when map is ready
+
+    // Effect for managing the hover animation loop
+    useEffect(() => {
+        const overlay = overlayRef.current;
+        if (!overlay) return;
+
+        let lastHoveredCell = null;
+        const animateHover = () => {
+            if (hoveredCellRef.current !== lastHoveredCell) {
+                overlay.drawDynamic();
+                lastHoveredCell = hoveredCellRef.current;
+            }
+            animationFrameRef.current = requestAnimationFrame(animateHover);
+        };
+
+        animationFrameRef.current = requestAnimationFrame(animateHover);
+
+        return () => {
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+            }
+        };
+    }, []); // Empty dependency array ensures this runs once
 
     // Effect for Drawing Updates: Passes drawable cells from state to the overlay instance.
     useEffect(() => {
