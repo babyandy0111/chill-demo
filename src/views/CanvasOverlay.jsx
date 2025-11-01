@@ -29,12 +29,12 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
     const [drawableCells, setDrawableCells] = useState({ claimed: [], explored: [] });
     const animationFrameRef = useRef();
     const noisePatternRef = useRef(null);
-    const claimedCellsRef = useRef(claimedCells);
-    const exploredCellsRef = useRef(exploredCells);
 
+    // Effect to notify worker when external data has changed
     useEffect(() => {
-        claimedCellsRef.current = claimedCells;
-        exploredCellsRef.current = exploredCells;
+        if (workerRef.current) {
+            workerRef.current.postMessage({ type: 'DATA_UPDATED' });
+        }
     }, [claimedCells, exploredCells]);
 
     // Effect for Initialization: Runs only when the map instance is ready.
@@ -284,24 +284,23 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
         };
 
         // 3. Setup Map Event Listeners
-        const updateGrid = () => {
+        // The 'idle' event will handle both the initial load and subsequent moves.
+        const idleListener = map.addListener('idle', () => {
             if (workerRef.current) {
                 const bounds = map.getBounds();
                 if (bounds) {
                     workerRef.current.postMessage({
-                        bounds: {
-                            southwest: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() },
-                            northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
-                        },
-                        zoom: map.getZoom(),
-                        claimedCells: claimedCellsRef.current,
-                        exploredCells: exploredCellsRef.current
+                        type: 'BOUNDS_CHANGED',
+                        payload: {
+                            bounds: {
+                                southwest: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() },
+                                northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
+                            }
+                        }
                     });
                 }
             }
-        };
-
-        const idleListener = map.addListener('idle', updateGrid);
+        });
         
         // 4. Cleanup
         return () => {
