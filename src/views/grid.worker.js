@@ -2,29 +2,10 @@ import { db } from '../db.js';
 
 const GRID_SIZE = 0.0005;
 
-let claimedCellKeys = new Set();
-let exploredCellKeys = new Set();
-let lastKnownBounds = null;
-let dataSynced = false; // Flag to check if initial sync is done
+let lastKnownBounds = null; // Still need to store last known bounds for DATA_UPDATED
 
-// --- Function to load all data from IndexedDB into memory ---
-async function syncDataFromDB() {
-    try {
-        const [claimed, explored] = await Promise.all([
-            db.claimedCells.toArray(),
-            db.exploredCells.toArray()
-        ]);
-        claimedCellKeys = new Set(claimed.map(cell => cell.id));
-        exploredCellKeys = new Set(explored.map(cell => cell.id));
-        dataSynced = true; // Mark sync as complete
-        console.log(`[Worker] Synced data: ${claimedCellKeys.size} claimed, ${exploredCellKeys.size} explored.`);
-    } catch (error) {
-        console.error("[Worker] Error syncing data from IndexedDB:", error);
-    }
-}
-
-// --- Function to calculate drawable cells based on current memory state ---
-function calculateAndPostCells(bounds) {
+// --- Function to calculate drawable cells by querying DB directly ---
+async function calculateAndPostCells(bounds) {
     if (!bounds) return;
     lastKnownBounds = bounds; // Save the latest bounds
 
@@ -36,25 +17,26 @@ function calculateAndPostCells(bounds) {
     const endIY = Math.floor(ne.lat / GRID_SIZE);
     const endIX = Math.floor(ne.lng / GRID_SIZE);
 
-    const claimedCellsToDraw = [];
-    const exploredCellsToDraw = [];
+    try {
+        // Query only the cells within the visible bounds
+        const claimedCellsInView = await db.claimedCells
+            .where('[iy+ix]')
+            .between([startIY, startIX], [endIY, endIX])
+            .toArray();
 
-    for (let iy = startIY; iy <= endIY; iy++) {
-        for (let ix = startIX; ix <= endIX; ix++) {
-            const key = `${iy}_${ix}`;
-            const south = iy * GRID_SIZE;
-            const west = ix * GRID_SIZE;
+        const exploredCellsInView = await db.exploredCells
+            .where('[iy+ix]')
+            .between([startIY, startIX], [endIY, endIX])
+            .toArray();
 
-            if (exploredCellKeys.has(key)) {
-                exploredCellsToDraw.push({ south, west });
-            }
-            if (claimedCellKeys.has(key)) {
-                claimedCellsToDraw.push({ south, west });
-            }
-        }
+        const claimedCellsToDraw = claimedCellsInView.map(cell => ({ south: cell.iy * GRID_SIZE, west: cell.ix * GRID_SIZE }));
+        const exploredCellsToDraw = exploredCellsInView.map(cell => ({ south: cell.iy * GRID_SIZE, west: cell.ix * GRID_SIZE }));
+
+        self.postMessage({ claimedCellsToDraw, exploredCellsToDraw });
+
+    } catch (error) {
+        console.error("[Worker] Error querying IndexedDB for cells:", error);
     }
-
-    self.postMessage({ claimedCellsToDraw, exploredCellsToDraw });
 }
 
 // --- Message router ---
@@ -63,17 +45,11 @@ self.onmessage = async (e) => {
 
     switch (type) {
         case 'BOUNDS_CHANGED':
-            // If this is the first time, sync from DB first.
-            if (!dataSynced) {
-                await syncDataFromDB();
-            }
             calculateAndPostCells(payload.bounds);
             break;
 
         case 'DATA_UPDATED':
-            // Force a re-sync from the database
-            await syncDataFromDB();
-            // Recalculate using the last known map position
+            // Recalculate using the last known map position, which will trigger a fresh DB query
             if (lastKnownBounds) {
                 calculateAndPostCells(lastKnownBounds);
             }

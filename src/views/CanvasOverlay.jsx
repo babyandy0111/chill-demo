@@ -162,19 +162,28 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const rectY = pixelNE.y - this.nePixel.y;
                 const rectWidth = pixelNE.x - pixelSW.x;
                 const rectHeight = pixelSW.y - pixelNE.y;
-                const centerX = rectX + rectWidth / 2;
-                const centerY = rectY + rectHeight / 2;
-                const radiusX = rectWidth * 2.5;
-                const radiusY = rectHeight * 2.5;
 
-                const gradient = this.fogCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(radiusX, radiusY));
-                gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
-                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                // --- Level of Detail (LOD) Implementation ---
+                if (this.props.zoom < 14) {
+                    // Low zoom: Draw a simple, fast square
+                    this.fogCtx.fillStyle = 'rgba(0, 0, 0, 1)';
+                    this.fogCtx.fillRect(rectX, rectY, rectWidth, rectHeight);
+                } else {
+                    // High zoom: Draw the detailed, feathered circle
+                    const centerX = rectX + rectWidth / 2;
+                    const centerY = rectY + rectHeight / 2;
+                    const radiusX = rectWidth * 2.5;
+                    const radiusY = rectHeight * 2.5;
 
-                this.fogCtx.fillStyle = gradient;
-                this.fogCtx.beginPath();
-                this.fogCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
-                this.fogCtx.fill();
+                    const gradient = this.fogCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(radiusX, radiusY));
+                    gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+                    this.fogCtx.fillStyle = gradient;
+                    this.fogCtx.beginPath();
+                    this.fogCtx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+                    this.fogCtx.fill();
+                }
             }
 
             drawRevealEffect(effect, progress, projection) {

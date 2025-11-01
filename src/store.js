@@ -70,7 +70,7 @@ export const useAppStore = create(
                                 if (i * i + j * j <= EXPLORE_RADIUS * EXPLORE_RADIUS) {
                                     const key = `${iy + i}_${ix + j}`;
                                     if (!exploredCellKeys.has(key)) {
-                                        const newCell = { id: key };
+                                        const newCell = { id: key, iy: iy + i, ix: ix + j };
                                         state.exploredCells.push(newCell); // FIX: Use array.push
                                         cellsToAdd.push(newCell);
                                         exploredCellKeys.add(key);
@@ -115,19 +115,21 @@ export const useAppStore = create(
             if (clouds <= 0) return 'no-clouds';
 
             const { key } = selectedCell;
+            const [iy, ix] = key.split('_').map(Number);
             const cellData = { owner: 'user', color: '#3B82F6' };
-            const newClaimedCell = { id: key, data: cellData };
+            const newClaimedCell = { id: key, iy, ix, data: cellData };
 
             const exploredCellKeys = new Set(get().exploredCells.map(c => c.id));
-            const [iy, ix] = key.split('_').map(Number);
             const cellsToExplore = [];
             const EXPLORE_RADIUS = 1;
 
             for (let i = -EXPLORE_RADIUS; i <= EXPLORE_RADIUS; i++) {
                 for (let j = -EXPLORE_RADIUS; j <= EXPLORE_RADIUS; j++) {
-                    const newKey = `${iy + i}_${ix + j}`;
+                    const currentIY = iy + i;
+                    const currentIX = ix + j;
+                    const newKey = `${currentIY}_${currentIX}`;
                     if (!exploredCellKeys.has(newKey)) {
-                        cellsToExplore.push({ id: newKey });
+                        cellsToExplore.push({ id: newKey, iy: currentIY, ix: currentIX });
                     }
                 }
             }
