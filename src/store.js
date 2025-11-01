@@ -91,12 +91,31 @@ export const useAppStore = create(
 
         selectCell: (cell) => {
             const currentSelected = get().selectedCell;
-            // FIX: Use array.some to check for claimed cells
-            const isClaimed = get().claimedCells.some(c => c.id === cell?.key);
+            const claimedCells = get().claimedCells;
+            const cellKey = cell?.key;
 
-            if (!cell || (currentSelected && currentSelected.key === cell.key) || isClaimed) {
+            console.log(`[selectCell] Checking cell with key: ${cellKey}`);
+
+            const isClaimed = claimedCells.some(c => c.id === cellKey);
+
+            console.log(`[selectCell] Is this cell claimed? ${isClaimed}`);
+            if (isClaimed) {
+                console.log('[selectCell] Reason: Cell is already in the claimedCells list.');
+                const problematicCell = claimedCells.find(c => c.id === cellKey);
+                console.log('[selectCell] Problematic cell data:', problematicCell);
+            }
+
+            if (!cell) {
+                console.log('[selectCell] Decision: Deselecting (cell is null).');
+                set({ selectedCell: null });
+            } else if (currentSelected && currentSelected.key === cellKey) {
+                console.log('[selectCell] Decision: Deselecting (clicking the same cell again).');
+                set({ selectedCell: null });
+            } else if (isClaimed) {
+                console.log('[selectCell] Decision: Deselecting (cell is already claimed).');
                 set({ selectedCell: null });
             } else {
+                console.log('[selectCell] Decision: Selecting cell.');
                 set({ selectedCell: cell });
             }
         },

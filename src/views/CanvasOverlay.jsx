@@ -247,12 +247,35 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 }
             }
 
+            drawClaimedCells(projection) {
+                this.drawableClaimed.forEach(cell => {
+                    const { south, west } = cell;
+                    const cellSW = new window.google.maps.LatLng(south, west);
+                    const cellNE = new window.google.maps.LatLng(south + GRID_SIZE, west + GRID_SIZE);
+                    const pixelSW = projection.fromLatLngToDivPixel(cellSW);
+                    const pixelNE = projection.fromLatLngToDivPixel(cellNE);
+
+                    if (!pixelSW || !pixelNE) return;
+
+                    const rectX = pixelSW.x - this.swPixel.x;
+                    const rectY = pixelNE.y - this.nePixel.y;
+                    const rectWidth = pixelNE.x - pixelSW.x;
+                    const rectHeight = pixelSW.y - pixelNE.y;
+
+                    this.dynamicCtx.fillStyle = 'rgba(59, 130, 246, 0.2)'; // Semi-transparent blue for claimed cells
+                    this.dynamicCtx.fillRect(rectX, rectY, rectWidth, rectHeight);
+                });
+            }
+
             drawDynamic() {
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
 
                 const { hoveredCell, selectedCell } = this.props;
                 this.dynamicCtx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
+
+                // --- Draw claimed cells first ---
+                this.drawClaimedCells(projection);
 
                 const cellToHighlight = selectedCell ? selectedCell.key : hoveredCell;
                 if (!cellToHighlight) return;
@@ -272,7 +295,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                 const rectWidth = pixelNE.x - pixelSW.x;
                 const rectHeight = pixelSW.y - pixelNE.y;
 
-                this.dynamicCtx.fillStyle = 'rgba(59, 130, 246, 0.4)';
+                this.dynamicCtx.fillStyle = 'rgba(59, 130, 246, 0.4)'; // A slightly stronger blue for hover/selection
                 this.dynamicCtx.fillRect(rectX, rectY, rectWidth, rectHeight);
             }
         }
