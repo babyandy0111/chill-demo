@@ -26,7 +26,7 @@ const styles = {
     },
     topLeftControls: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(env(safe-area-inset-top, 0px) + 16px)',
         left: '16px',
         display: 'flex',
         flexDirection: 'column',
@@ -49,14 +49,14 @@ const styles = {
     },
     topCenterContainer: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(env(safe-area-inset-top, 0px) + 16px)',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 50,
     },
     topRightContainer: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(env(safe-area-inset-top, 0px) + 16px)',
         right: '16px',
         zIndex: 50,
         display: 'flex',
@@ -65,13 +65,13 @@ const styles = {
     },
     bottomRightContainer: {
         position: 'absolute',
-        bottom: '16px',
+        bottom: '120px', // Adjusted for better visibility on mobile
         right: '16px',
         zIndex: 50,
     },
     bottomLeftContainer: {
         position: 'absolute',
-        bottom: '4px',
+        bottom: '120px', // Adjusted for better visibility on mobile
         left: '8px',
         zIndex: 50,
     },
