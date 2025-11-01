@@ -118,9 +118,9 @@ const MapWithClouds = ({
 
     const handleDragEnd = useCallback(() => {
         if (!mapInstance) return;
-        const newCenter = mapInstance.getCenter();
-        onCenterChanged({ lat: newCenter.lat(), lng: newCenter.lng() });
-    }, [mapInstance, onCenterChanged]);
+        // The center change is now handled by the `onIdle` event to prevent
+        // excessive URL updates during user interaction.
+    }, [mapInstance]);
 
     const mapContainerRef = useRef(null); // Ref for the map container div
 

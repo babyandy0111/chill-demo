@@ -13,6 +13,9 @@ const GlobeView = lazy(() => {
 });
 const App = lazy(() => import('./App.jsx'));
 
+// Create a single element instance to share across both map routes
+const appElement = <App />;
+
 // Create a browser router with route configuration
 const router = createBrowserRouter([
   {
@@ -20,12 +23,12 @@ const router = createBrowserRouter([
     element: <GlobeView />,
   },
   {
-    path: '/map', // Add route for /map without params
-    element: <App />,
+    path: '/map',
+    element: appElement,
   },
   {
     path: '/map/:lat/:lng',
-    element: <App />,
+    element: appElement,
   },
 ], {
   basename: "/chill-demo", // Set the basename for GitHub Pages
