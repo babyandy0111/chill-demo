@@ -198,8 +198,8 @@ const MapWithClouds = ({
                 <CanvasOverlay
                     map={mapInstance}
                     zoom={zoom}
-                    claimedCells={showClaimedCells ? claimedCells : []}
-                    exploredCells={showClaimedCells ? exploredCells : []}
+                    claimedCells={claimedCells}
+                    exploredCells={exploredCells}
                     hoveredCell={hoveredCell}
                     isAnimating={isAnimating}
                     selectedCell={selectedCell}
