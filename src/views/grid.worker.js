@@ -17,27 +17,30 @@ async function calculateAndPostCells(bounds) {
     const endIY = Math.floor(ne.lat / GRID_SIZE);
     const endIX = Math.floor(ne.lng / GRID_SIZE);
 
-    try {
-        // Query only the cells within the visible bounds
-        const claimedCellsInView = await db.claimedCells
-            .where('[iy+ix]')
-            .between([startIY, startIX], [endIY, endIX])
-            .toArray();
-
-        const exploredCellsInView = await db.exploredCells
-            .where('[iy+ix]')
-            .between([startIY, startIX], [endIY, endIX])
-            .toArray();
-
-        const claimedCellsToDraw = claimedCellsInView.map(cell => ({ south: cell.iy * GRID_SIZE, west: cell.ix * GRID_SIZE }));
-        const exploredCellsToDraw = exploredCellsInView.map(cell => ({ south: cell.iy * GRID_SIZE, west: cell.ix * GRID_SIZE }));
-
-        self.postMessage({ claimedCellsToDraw, exploredCellsToDraw });
-
-    } catch (error) {
-        console.error("[Worker] Error querying IndexedDB for cells:", error);
-    }
-}
+            try {
+                // Query both tables for cells within the visible bounds
+                const [claimedCellsInView, exploredCellsInView] = await Promise.all([
+                    db.claimedCells.where('[iy+ix]').between([startIY, startIX], [endIY, endIX]).toArray(),
+                    db.exploredCells.where('[iy+ix]').between([startIY, startIX], [endIY, endIX]).toArray()
+                ]);
+    
+                // --- Logic to ensure claimed cells are always explored ---
+                const exploredMap = new Map();
+                // First, add all officially explored cells
+                exploredCellsInView.forEach(cell => exploredMap.set(cell.id, cell));
+                // Then, add all claimed cells, overwriting duplicates. This handles inconsistent data.
+                claimedCellsInView.forEach(cell => exploredMap.set(cell.id, cell));
+    
+                const combinedExploredCells = Array.from(exploredMap.values());
+    
+                const claimedCellsToDraw = claimedCellsInView.map(cell => ({ south: cell.iy * GRID_SIZE, west: cell.ix * GRID_SIZE }));
+                const exploredCellsToDraw = combinedExploredCells.map(cell => ({ south: cell.iy * GRID_SIZE, west: cell.ix * GRID_SIZE }));
+    
+                self.postMessage({ claimedCellsToDraw, exploredCellsToDraw });
+    
+            } catch (error) {
+                console.error("[Worker] Error querying IndexedDB for cells:", error);
+            }}
 
 // --- Message router ---
 self.onmessage = async (e) => {
