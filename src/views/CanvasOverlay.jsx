@@ -29,6 +29,13 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
     const [drawableCells, setDrawableCells] = useState({ claimed: [], explored: [] });
     const animationFrameRef = useRef();
     const noisePatternRef = useRef(null);
+    const claimedCellsRef = useRef(claimedCells);
+    const exploredCellsRef = useRef(exploredCells);
+
+    useEffect(() => {
+        claimedCellsRef.current = claimedCells;
+        exploredCellsRef.current = exploredCells;
+    }, [claimedCells, exploredCells]);
 
     // Effect for Initialization: Runs only when the map instance is ready.
     useEffect(() => {
@@ -277,8 +284,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
         };
 
         // 3. Setup Map Event Listeners
-        let throttleTimeout = null;
-        const THROTTLE_MS = 100;
         const updateGrid = () => {
             if (workerRef.current) {
                 const bounds = map.getBounds();
@@ -289,20 +294,12 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
                             northeast: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }
                         },
                         zoom: map.getZoom(),
-                        claimedCells: claimedCells, // Pass current props directly
-                        exploredCells: exploredCells
+                        claimedCells: claimedCellsRef.current,
+                        exploredCells: exploredCellsRef.current
                     });
                 }
             }
         };
-
-        const boundsListener = map.addListener('bounds_changed', () => {
-            if (throttleTimeout) return;
-            throttleTimeout = setTimeout(() => {
-                updateGrid();
-                throttleTimeout = null;
-            }, THROTTLE_MS);
-        });
 
         const idleListener = map.addListener('idle', updateGrid);
         
@@ -310,12 +307,10 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
         return () => {
             worker.terminate();
             overlay.setMap(null);
-            window.google.maps.event.removeListener(boundsListener);
             window.google.maps.event.removeListener(idleListener);
-            if (throttleTimeout) clearTimeout(throttleTimeout);
             if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
         };
-    }, [map, claimedCells, exploredCells]); // Dependency on map ensures this runs once when map is ready
+    }, [map]); // Dependency on map ensures this runs once when map is ready
 
     // Effect for Drawing Updates: Passes drawable cells from state to the overlay instance.
     useEffect(() => {
