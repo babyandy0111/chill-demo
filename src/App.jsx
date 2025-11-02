@@ -238,16 +238,17 @@ function App() {
         }
     }, [userLocation, setIsAnimating]);
 
-    const handleCenterChanged = useCallback((newCenter) => {
-        // This is now the single source of truth for the map's position during a session.
-        try {
-            // We only store valid coordinates
-            if (newCenter && typeof newCenter.lat === 'number' && isFinite(newCenter.lat) &&
-                typeof newCenter.lng === 'number' && isFinite(newCenter.lng)) {
-                localStorage.setItem('lastKnownLocation', JSON.stringify(newCenter));
+    const handleMapIdle = useCallback(() => {
+        if (mapRef.current) {
+            const currentCenter = mapRef.current.getCenter().toJSON();
+            try {
+                if (currentCenter && typeof currentCenter.lat === 'number' && isFinite(currentCenter.lat) &&
+                    typeof currentCenter.lng === 'number' && isFinite(currentCenter.lng)) {
+                    localStorage.setItem('lastKnownLocation', JSON.stringify(currentCenter));
+                }
+            } catch (error) {
+                console.error("Could not write to localStorage:", error);
             }
-        } catch (error) {
-            console.error("Could not write to localStorage:", error);
         }
     }, []);
 
@@ -288,8 +289,7 @@ function App() {
                 claimedCells={claimedCells}
                 exploredCells={exploredCells}
                 setMapRef={setMapRef}
-                onZoomChanged={() => {}}
-                onCenterChanged={handleCenterChanged}
+                onMapIdle={handleMapIdle}
                 selectedCell={selectedCell}
                 userLocation={userLocation}
                 // onZoomOutLimit={handleZoomOutLimit}

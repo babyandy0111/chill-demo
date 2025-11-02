@@ -28,7 +28,7 @@ const MapWithClouds = ({
                            exploredCells,
                            setMapRef,
                            onZoomChanged,
-                           onCenterChanged,
+                           onMapIdle,
                            selectedCell,
                            userLocation,
                            onZoomOutLimit,
@@ -67,9 +67,9 @@ const MapWithClouds = ({
         }
 
         onZoomChanged(newZoom);
-        onCenterChanged({ lat: newCenter.lat(), lng: newCenter.lng() });
+        onMapIdle({ lat: newCenter.lat(), lng: newCenter.lng() });
         setZoom(newZoom);
-    }, [mapInstance, onZoomChanged, onCenterChanged, onZoomOutLimit]);
+    }, [mapInstance, onZoomChanged, onMapIdle, onZoomOutLimit]);
 
     useEffect(() => {
         const runAnimation = async () => {
