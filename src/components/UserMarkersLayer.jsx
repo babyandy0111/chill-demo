@@ -73,11 +73,10 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
 
                 this.props = {};
                 this.mapDiv = null;
-                this.hoveredUser = null;
                 this.imageCache = new Map();
                 this.defaultAvatar = createDefaultAvatar();
 
-                this.handleMouseMove = this.handleMouseMove.bind(this);
+                // this.handleMouseMove = this.handleMouseMove.bind(this); // COMMENTED OUT
                 this.handleClick = this.handleClick.bind(this);
             }
 
@@ -90,7 +89,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 const panes = this.getPanes();
                 panes.overlayLayer.appendChild(this.canvas);
                 this.mapDiv = this.getMap().getDiv();
-                this.mapDiv.addEventListener('mousemove', this.handleMouseMove);
+                // this.mapDiv.addEventListener('mousemove', this.handleMouseMove); // COMMENTED OUT
                 this.mapDiv.addEventListener('click', this.handleClick);
             }
 
@@ -99,7 +98,7 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                     this.canvas.parentElement.removeChild(this.canvas);
                 }
                 if (this.mapDiv) {
-                    this.mapDiv.removeEventListener('mousemove', this.handleMouseMove);
+                    // this.mapDiv.removeEventListener('mousemove', this.handleMouseMove); // COMMENTED OUT
                     this.mapDiv.removeEventListener('click', this.handleClick);
                     this.mapDiv = null;
                 }
@@ -132,14 +131,11 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 return closestUser;
             }
 
-            handleMouseMove(e) {
-                const user = this.findUserAtPixel(e.offsetX, e.offsetY);
-                if (user !== this.hoveredUser) {
-                    this.hoveredUser = user;
-                    this.draw(); // Manually trigger redraw for hover effect
-                }
-                this.getMap().getDiv().style.cursor = user ? 'pointer' : '';
-            }
+            // handleMouseMove(e) {
+            //     const user = this.findUserAtPixel(e.offsetX, e.offsetY);
+            //     // Only change cursor, do not trigger redraw for hover effect
+            //     this.getMap().getDiv().style.cursor = user ? 'pointer' : '';
+            // }
 
             handleClick(e) {
                 const user = this.findUserAtPixel(e.offsetX, e.offsetY);
@@ -188,7 +184,6 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
                 const drawY = point.y - nePixel.y;
                 const zoom = this.getMap().getZoom();
                 const imageSize = Math.max(16, Math.min(80, (zoom - 12) * 8));
-                const isHovered = this.hoveredUser && this.hoveredUser.seq === user.seq;
                 const imageUrl = user.avatarUrl || '/chill-demo/vite.svg';
 
                 const cacheEntry = this.imageCache.get(imageUrl);
@@ -204,12 +199,12 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
 
                     img.onload = () => {
                         this.imageCache.get(imageUrl).loaded = true;
-                        this.draw(); // CRITICAL: Redraw when image is ready
+                        // No direct redraw here. Rely on map's draw cycle.
                     };
                     img.onerror = () => {
                         this.imageCache.get(imageUrl).image = this.defaultAvatar;
                         this.imageCache.get(imageUrl).loaded = true;
-                        this.draw(); // Also redraw on error to show default avatar
+                        // No direct redraw here. Rely on map's draw cycle.
                     };
                     img.src = imageUrl;
                     this.ctx.drawImage(this.defaultAvatar, drawX - imageSize / 2, drawY - imageSize / 2, imageSize, imageSize);
@@ -217,8 +212,8 @@ const UserMarkersLayer = ({ map, users, isVisible }) => {
 
                 this.ctx.beginPath();
                 this.ctx.arc(drawX, drawY, imageSize / 2, 0, Math.PI * 2, true);
-                this.ctx.strokeStyle = isHovered ? '#007BFF' : 'red';
-                this.ctx.lineWidth = isHovered ? 6 : 2;
+                this.ctx.strokeStyle = 'red';
+                this.ctx.lineWidth = 2;
                 this.ctx.stroke();
             }
 
