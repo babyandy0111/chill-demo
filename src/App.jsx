@@ -275,6 +275,7 @@ function App() {
                 claimedCells={claimedCells}
                 exploredCells={exploredCells}
                 setMapRef={setMapRef}
+                onZoomChanged={() => {}}
                 onMapIdle={handleMapIdle}
                 selectedCell={selectedCell}
                 userLocation={userLocation}
