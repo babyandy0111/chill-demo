@@ -14,8 +14,23 @@ export const useAppStore = create(
         userLocation: null,
         isHydrated: false,
         lastCloudIncrease: Date.now(),
+        lastKnownLocation: null, // New: Store the last known map center
 
         // --- ACTIONS ---
+
+        updateLastKnownLocation: (newLocation) => {
+            set((state) => {
+                state.lastKnownLocation = newLocation;
+            });
+            try {
+                if (newLocation && typeof newLocation.lat === 'number' && isFinite(newLocation.lat) &&
+                    typeof newLocation.lng === 'number' && isFinite(newLocation.lng)) {
+                    localStorage.setItem('lastKnownLocation', JSON.stringify(newLocation));
+                }
+            } catch (error) {
+                console.error("Could not write to localStorage from Zustand:", error);
+            }
+        },
 
         hydrate: async () => {
             try {

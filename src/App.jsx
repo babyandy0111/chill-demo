@@ -78,20 +78,30 @@ const styles = {
 function App() {
     const { lat, lng } = useParams();
     const navigate = useNavigate();
+
+    // --- ZUSTAND STATE ---
+    const claimedCells = useAppStore(state => state.claimedCells);
+    const exploredCells = useAppStore(state => state.exploredCells);
+    const selectedCell = useAppStore(state => state.selectedCell);
+    const userLocation = useAppStore(state => state.userLocation);
+    const clouds = useAppStore(state => state.clouds);
+    const initializeGeolocation = useAppStore(state => state.initializeGeolocation);
+    const selectCell = useAppStore(state => state.selectCell);
+    const claimSelectedCell = useAppStore(state => state.claimSelectedCell);
+    const register = useAppStore(state => state.register);
+    const isHydrated = useAppStore(state => state.isHydrated);
+    const hydrate = useAppStore(state => state.hydrate);
+    const lastKnownLocation = useAppStore(state => state.lastKnownLocation); // New: Get from Zustand
+    const updateLastKnownLocation = useAppStore(state => state.updateLastKnownLocation); // New: Get from Zustand
     
     const [center, setCenter] = useState(() => {
         // 1. Prioritize URL params (for shared links)
         if (lat && lng) {
             return { lat: parseFloat(lat), lng: parseFloat(lng) };
         }
-        // 2. Fallback to localStorage
-        try {
-            const lastKnownLocation = localStorage.getItem('lastKnownLocation');
-            if (lastKnownLocation) {
-                return JSON.parse(lastKnownLocation);
-            }
-        } catch (error) {
-            console.error("Could not read from localStorage:", error);
+        // 2. Fallback to Zustand store's lastKnownLocation
+        if (lastKnownLocation) {
+            return lastKnownLocation;
         }
         // 3. Default to null, which will trigger the geolocation fetch effect
         return null;
@@ -99,18 +109,6 @@ function App() {
 
     const [isReturning, setIsReturning] = useState(false);
     const mapRef = useRef(null);
-
-    const claimedCells = useAppStore(state => state.claimedCells);
-    const exploredCells = useAppStore(state => state.exploredCells);
-    const selectedCell = useAppStore(state => state.selectedCell);
-    const userLocation = useAppStore(state => state.userLocation);
-    const clouds = useAppStore(state => state.clouds); // Re-add clouds state retrieval
-    const initializeGeolocation = useAppStore(state => state.initializeGeolocation);
-    const selectCell = useAppStore(state => state.selectCell);
-    const claimSelectedCell = useAppStore(state => state.claimSelectedCell);
-    const register = useAppStore(state => state.register);
-    const isHydrated = useAppStore(state => state.isHydrated);
-    const hydrate = useAppStore(state => state.hydrate);
 
     // --- HOOKS ---
     useGeocoding(selectedCell); // Geocoding logic is now self-contained in this hook
@@ -132,15 +130,17 @@ function App() {
 
     useEffect(() => {
         if (center) return;
+        // If center is still null after URL and Zustand, try GPS
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                setCenter({
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude,
-                });
+                const newCenter = { lat: position.coords.latitude, lng: position.coords.longitude };
+                setCenter(newCenter);
+                updateLastKnownLocation(newCenter); // Update Zustand and localStorage
             },
             () => {
-                setCenter({ lat: 25.033, lng: 121.5654 });
+                const defaultCenter = { lat: 25.033, lng: 121.5654 };
+                setCenter(defaultCenter);
+                updateLastKnownLocation(defaultCenter); // Update Zustand and localStorage
             },
             {
                 enableHighAccuracy: true,
@@ -148,7 +148,7 @@ function App() {
                 maximumAge: 0,
             }
         );
-    }, [center]);
+    }, [center, updateLastKnownLocation]);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
@@ -223,20 +223,7 @@ function App() {
         }
     }, [userLocation, setIsAnimating]);
 
-    const handleMapIdle = useCallback(() => {
-        if (mapRef.current) {
-            const currentCenter = mapRef.current.getCenter().toJSON();
-            try {
-                if (currentCenter && typeof currentCenter.lat === 'number' && isFinite(currentCenter.lat) &&
-                    typeof currentCenter.lng === 'number' && isFinite(currentCenter.lng)) {
-                    localStorage.setItem('lastKnownLocation', JSON.stringify(currentCenter));
-                    setCenter(currentCenter); // <-- 新增這行，更新 React 狀態
-                }
-            } catch (error) {
-                console.error("Could not write to localStorage:", error);
-            }
-        }
-    }, [setCenter]);
+
 
     const handleZoomIn = useCallback(async () => {
         if (mapRef.current) {
@@ -276,7 +263,6 @@ function App() {
                 exploredCells={exploredCells}
                 setMapRef={setMapRef}
                 onZoomChanged={() => {}}
-                onMapIdle={handleMapIdle}
                 selectedCell={selectedCell}
                 userLocation={userLocation}
                 isAnimating={isAnimating}

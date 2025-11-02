@@ -6,6 +6,7 @@ import CurrentUserLocationMarker from "../components/CurrentUserLocationMarker.j
 import { smoothAnimate } from "../map-animation.js";
 import { fetchUserLocations } from '../data-loader.js';
 import UserMarkersLayer from '../components/UserMarkersLayer.jsx';
+import { useAppStore } from '../store.js'; // Import useAppStore
 
 
 const GRID_SIZE = 0.0005;
@@ -27,7 +28,6 @@ const MapWithClouds = ({
                            claimedCells,
                            exploredCells,
                            setMapRef,
-                           onMapIdle,
                            selectedCell,
                            userLocation,
                            onZoomOutLimit,
@@ -41,11 +41,7 @@ const MapWithClouds = ({
     const WHEEL_THROTTLE_MS = 150;
     const [isAnimating, setIsAnimating] = useState(false);
     const [userMarkers, setUserMarkers] = useState([]); // 新增 state 來儲存使用者標記數據
-    const onMapIdleRef = useRef(onMapIdle);
-
-    useEffect(() => {
-        onMapIdleRef.current = onMapIdle;
-    }, [onMapIdle]);
+    const updateLastKnownLocation = useAppStore(state => state.updateLastKnownLocation); // Get action from Zustand
 
 
     // 在元件掛載時載入使用者數據
@@ -68,18 +64,9 @@ const MapWithClouds = ({
             onZoomOutLimit();
         }
 
-        // Directly write to localStorage for testing purposes
-        try {
-            const currentCenter = mapInstance.getCenter().toJSON();
-            if (currentCenter && typeof currentCenter.lat === 'number' && isFinite(currentCenter.lat) &&
-                typeof currentCenter.lng === 'number' && isFinite(currentCenter.lng)) {
-                localStorage.setItem('lastKnownLocation', JSON.stringify(currentCenter));
-            }
-        } catch (error) {
-            console.error("Could not write to localStorage from MapWithClouds:", error);
-        }
+        updateLastKnownLocation({ lat: mapInstance.getCenter().lat(), lng: mapInstance.getCenter().lng() });
         setZoom(newZoom);
-    }, [mapInstance, onZoomOutLimit]);
+    }, [mapInstance, onZoomOutLimit, updateLastKnownLocation]);
 
     useEffect(() => {
         // This effect runs only once on initial load to perform the fly-in animation.
@@ -92,21 +79,14 @@ const MapWithClouds = ({
                     mapInstance.set('initialAnimationCompleted', true);
                     // After the very first animation, directly call the idle logic
                     // to ensure the initial position is saved correctly.
-                    try {
-                        if (center && typeof center.lat === 'number' && isFinite(center.lat) &&
-                            typeof center.lng === 'number' && isFinite(center.lng)) {
-                            localStorage.setItem('lastKnownLocation', JSON.stringify(center));
-                        }
-                    } catch (error) {
-                        console.error("Could not write to localStorage from MapWithClouds (useEffect):", error);
-                    }
+                    updateLastKnownLocation(center);
                 }
             }
         };
         runAnimation();
         // We intentionally leave the dependency array sparse. This effect should
         // only be about the *initial* animation, not reacting to every center change.
-    }, [mapInstance, center, setIsAnimating]);
+    }, [mapInstance, center, setIsAnimating, updateLastKnownLocation]);
 
 
 

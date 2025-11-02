@@ -8,6 +8,7 @@ import earthImage from '../assets/earth-8k.webp';
 import capitalsData from '../assets/capitals.json';
 import Leaderboard from '../components/Leaderboard.jsx';
 import cloudsTexture from '../assets/clouds.png';
+import { useAppStore } from '../store.js'; // Import useAppStore
 
 const featureMap = new Map(
     countriesData.features.map(feature => [feature, feature.properties])
@@ -43,6 +44,7 @@ const GlobeView = () => {
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const navigate = useNavigate();
     const [cloudLayer, setCloudLayer] = useState(null);
+    const updateLastKnownLocation = useAppStore(state => state.updateLastKnownLocation); // Get action from Zustand
 
 
     useEffect(() => {
@@ -122,6 +124,7 @@ const GlobeView = () => {
                 // New: Save location to localStorage and navigate to the simple /map route
                 try {
                     localStorage.setItem('lastKnownLocation', JSON.stringify({ lat, lng }));
+                    updateLastKnownLocation({ lat, lng }); // Update Zustand store
                 } catch (error) {
                     console.error("Could not write to localStorage:", error);
                 }
