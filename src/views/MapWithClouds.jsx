@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useEffect, useRef} from "react";
+import React, {useState, useCallback, useEffect, useRef, useMemo} from "react";
 import {GoogleMap} from "@react-google-maps/api";
 import CanvasOverlay from "./CanvasOverlay.jsx";
 import CellInfoWindow from "../components/CellInfoWindow.jsx";
@@ -8,6 +8,15 @@ import { fetchUserLocations } from '../data-loader.js';
 import UserMarkersLayer from '../components/UserMarkersLayer.jsx';
 import { useAppStore } from '../store.js'; // Import useAppStore
 
+// Simple debounce utility
+const debounce = (func, delay) => {
+    let timeout;
+    return function(...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+};
 
 const GRID_SIZE = 0.0005;
 const mapContainerStyle = {width: "100%", height: "100%"};
@@ -43,17 +52,6 @@ const MapWithClouds = ({
     const [userMarkers, setUserMarkers] = useState([]); // 新增 state 來儲存使用者標記數據
     const updateLastKnownLocation = useAppStore(state => state.updateLastKnownLocation); // Get action from Zustand
 
-
-    // 在元件掛載時載入使用者數據
-    useEffect(() => {
-        fetchUserLocations().then(setUserMarkers);
-    }, []);
-
-    const handleMapLoad = useCallback((map) => {
-        setMapInstance(map);
-        setMapRef(map);
-    }, [setMapRef]);
-
     const handleIdle = useCallback(() => {
         if (!mapInstance) return;
 
@@ -67,6 +65,18 @@ const MapWithClouds = ({
         updateLastKnownLocation({ lat: mapInstance.getCenter().lat(), lng: mapInstance.getCenter().lng() });
         setZoom(newZoom);
     }, [mapInstance, onZoomOutLimit, updateLastKnownLocation]);
+
+    const debouncedHandleIdle = useMemo(() => debounce(handleIdle, 200), [handleIdle]);
+
+    // 在元件掛載時載入使用者數據
+    useEffect(() => {
+        fetchUserLocations().then(setUserMarkers);
+    }, []);
+
+    const handleMapLoad = useCallback((map) => {
+        setMapInstance(map);
+        setMapRef(map);
+    }, [setMapRef]);
 
     useEffect(() => {
         // This effect runs only once on initial load to perform the fly-in animation.
@@ -152,7 +162,7 @@ const MapWithClouds = ({
                     scrollwheel: false,
                 }}
                 onLoad={handleMapLoad}
-                onIdle={handleIdle}
+                onIdle={debouncedHandleIdle}
 
                 onClick={handleClick}
             >

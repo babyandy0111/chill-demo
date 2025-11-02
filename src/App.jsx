@@ -201,17 +201,21 @@ function App() {
     }, [register]);
 
     const handleReturnToGlobe = useCallback(async () => {
+        if (isAnimating) return; // Prevent new animation if one is already running
         if (!mapRef.current) return;
+        setIsReturning(true); // Set returning state before starting
+        setIsAnimating(true); // Set animating state before starting
         const currentCenter = mapRef.current.getCenter();
         const lat = currentCenter.lat();
         const lng = currentCenter.lng();
-        setIsReturning(true);
         await smoothAnimate(mapRef.current, { lat, lng }, 1500, 2, setIsAnimating);
         navigate('/');
-    }, [navigate, setIsAnimating]);
+    }, [navigate, isAnimating, setIsAnimating]);
 
     const handleCompassClick = useCallback(async () => {
+        if (isAnimating) return; // Prevent new animation if one is already running
         if (userLocation && mapRef.current) {
+            setIsAnimating(true); // Set animating state before starting
             const map = mapRef.current;
             const currentCenter = map.getCenter();
             const currentCenterLiteral = { lat: currentCenter.lat(), lng: currentCenter.lng() };
@@ -221,29 +225,33 @@ function App() {
         } else {
             alert("無法取得您的位置資訊。請確認已授權瀏覽器存取您的位置。");
         }
-    }, [userLocation, setIsAnimating]);
+    }, [userLocation, isAnimating, setIsAnimating]);
 
 
 
     const handleZoomIn = useCallback(async () => {
+        if (isAnimating) return; // Prevent new animation if one is already running
         if (mapRef.current) {
+            setIsAnimating(true); // Set animating state before starting
             const currentZoom = mapRef.current.getZoom();
             const targetZoom = Math.min(20, currentZoom + 1); // Clamp to maxZoom
             if (targetZoom !== currentZoom) {
                 await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom, setIsAnimating); // Pass setIsAnimating
             }
         }
-    }, [setIsAnimating]);
+    }, [isAnimating, setIsAnimating]);
 
     const handleZoomOut = useCallback(async () => {
+        if (isAnimating) return; // Prevent new animation if one is already running
         if (mapRef.current) {
+            setIsAnimating(true); // Set animating state before starting
             const currentZoom = mapRef.current.getZoom();
             const targetZoom = Math.max(2, currentZoom - 1); // Clamp to minZoom
             if (targetZoom !== currentZoom) {
                 await smoothAnimate(mapRef.current, mapRef.current.getCenter().toJSON(), 300, targetZoom, setIsAnimating); // Pass setIsAnimating
             }
         }
-    }, [setIsAnimating]);
+    }, [isAnimating, setIsAnimating]);
 
     const handleInfoClick = useCallback(() => setIsInfoModalOpen(true), []);
     const handleCloseRegistrationModal = useCallback(() => setIsModalOpen(false), []);
