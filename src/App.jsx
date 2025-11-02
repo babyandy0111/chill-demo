@@ -245,12 +245,13 @@ function App() {
                 if (currentCenter && typeof currentCenter.lat === 'number' && isFinite(currentCenter.lat) &&
                     typeof currentCenter.lng === 'number' && isFinite(currentCenter.lng)) {
                     localStorage.setItem('lastKnownLocation', JSON.stringify(currentCenter));
+                    setCenter(currentCenter); // <-- 新增這行，更新 React 狀態
                 }
             } catch (error) {
                 console.error("Could not write to localStorage:", error);
             }
         }
-    }, []);
+    }, [setCenter]);
 
     const handleZoomIn = useCallback(async () => {
         if (mapRef.current) {
