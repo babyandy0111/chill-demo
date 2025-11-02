@@ -116,12 +116,6 @@ const MapWithClouds = ({
         }, WHEEL_THROTTLE_MS);
     }, [mapInstance, setIsAnimating]);
 
-    const handleDragEnd = useCallback(() => {
-        if (!mapInstance) return;
-        // The center change is now handled by the `onIdle` event to prevent
-        // excessive URL updates during user interaction.
-    }, [mapInstance]);
-
     const mapContainerRef = useRef(null); // Ref for the map container div
 
     useEffect(() => {
@@ -153,7 +147,6 @@ const MapWithClouds = ({
                 }}
                 onLoad={handleMapLoad}
                 onIdle={handleIdle}
-                onDragEnd={handleDragEnd}
 
                 onClick={handleClick}
             >

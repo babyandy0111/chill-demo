@@ -7,7 +7,7 @@ import Compass from './components/Compass.jsx';
 import CellInfoWindow from './components/CellInfoWindow.jsx';
 import {playClickSound} from './audioPlayer.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
-import CloudTimer from './components/CloudTimer.jsx'; // Import the new component
+import CloudTimer from './components/CloudTimer.jsx';
 import { useAppStore } from './store.js';
 import { smoothAnimate } from './map-animation.js';
 import { useGeocoding } from './hooks/useGeocoding.js';
@@ -15,8 +15,6 @@ import { useGeocoding } from './hooks/useGeocoding.js';
 const Leaderboard = lazy(() => import('./components/Leaderboard.jsx'));
 const RegistrationModal = lazy(() => import('./components/RegistrationModal.jsx'));
 const InfoModal = lazy(() => import('./components/InfoModal.jsx'));
-
-const GRID_SIZE = 0.0005;
 
 const styles = {
     app: {
@@ -186,11 +184,10 @@ function App() {
         };
 
         setEffects(currentEffects => [...currentEffects, newEffect]);
-        // The effect will remove itself from the canvas animation loop.
-        // We still need to clear the state in React.
+
         setTimeout(() => {
             setEffects(currentEffects => currentEffects.filter(effect => effect.id !== newEffect.id));
-        }, 2500); // Clear after the longest animation is done.
+        }, 2500);
 
     }, [claimSelectedCell, selectedCell]);
 
@@ -208,31 +205,19 @@ function App() {
         const currentCenter = mapRef.current.getCenter();
         const lat = currentCenter.lat();
         const lng = currentCenter.lng();
-        // The last location is already in localStorage, so we don't need to pass it in the state.
         setIsReturning(true);
-        await smoothAnimate(mapRef.current, { lat, lng }, 1500, 2, setIsAnimating); // Pass setIsAnimating
+        await smoothAnimate(mapRef.current, { lat, lng }, 1500, 2, setIsAnimating);
         navigate('/');
     }, [navigate, setIsAnimating]);
-
-    // const handleZoomOutLimit = useCallback(() => {
-    //     if (window.confirm("您已縮放到最小級別，要返回地球儀嗎？")) {
-    //         handleReturnToGlobe();
-    //     } else {
-    //         // If user cancels, zoom back in a bit to avoid being stuck
-    //         if (mapRef.current) {
-    //             mapRef.current.setZoom(mapRef.current.getZoom() + 1);
-    //         }
-    //     }
-    // }, [handleReturnToGlobe]);
 
     const handleCompassClick = useCallback(async () => {
         if (userLocation && mapRef.current) {
             const map = mapRef.current;
             const currentCenter = map.getCenter();
             const currentCenterLiteral = { lat: currentCenter.lat(), lng: currentCenter.lng() };
-            await smoothAnimate(map, currentCenterLiteral, 1000, 5, setIsAnimating); // Pass setIsAnimating
-            await smoothAnimate(map, userLocation, 1500, 5, setIsAnimating); // Pass setIsAnimating
-            await smoothAnimate(map, userLocation, 1000, 15, setIsAnimating); // Pass setIsAnimating
+            await smoothAnimate(map, currentCenterLiteral, 1000, 5, setIsAnimating);
+            await smoothAnimate(map, userLocation, 1500, 5, setIsAnimating);
+            await smoothAnimate(map, userLocation, 1000, 15, setIsAnimating);
         } else {
             alert("無法取得您的位置資訊。請確認已授權瀏覽器存取您的位置。");
         }
@@ -293,9 +278,8 @@ function App() {
                 onMapIdle={handleMapIdle}
                 selectedCell={selectedCell}
                 userLocation={userLocation}
-                // onZoomOutLimit={handleZoomOutLimit}
                 isAnimating={isAnimating}
-                effects={effects} // Pass down the effects
+                effects={effects}
             />
 
             {selectedCell && (
