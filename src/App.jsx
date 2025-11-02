@@ -82,9 +82,20 @@ function App() {
     const navigate = useNavigate();
     
     const [center, setCenter] = useState(() => {
+        // 1. Prioritize URL params (for shared links)
         if (lat && lng) {
             return { lat: parseFloat(lat), lng: parseFloat(lng) };
         }
+        // 2. Fallback to localStorage
+        try {
+            const lastKnownLocation = localStorage.getItem('lastKnownLocation');
+            if (lastKnownLocation) {
+                return JSON.parse(lastKnownLocation);
+            }
+        } catch (error) {
+            console.error("Could not read from localStorage:", error);
+        }
+        // 3. Default to null, which will trigger the geolocation fetch effect
         return null;
     });
 
@@ -197,9 +208,10 @@ function App() {
         const currentCenter = mapRef.current.getCenter();
         const lat = currentCenter.lat();
         const lng = currentCenter.lng();
+        // The last location is already in localStorage, so we don't need to pass it in the state.
         setIsReturning(true);
         await smoothAnimate(mapRef.current, { lat, lng }, 1500, 2, setIsAnimating); // Pass setIsAnimating
-        navigate('/', { state: { lat, lng } });
+        navigate('/');
     }, [navigate, setIsAnimating]);
 
     // const handleZoomOutLimit = useCallback(() => {
@@ -227,8 +239,17 @@ function App() {
     }, [userLocation, setIsAnimating]);
 
     const handleCenterChanged = useCallback((newCenter) => {
-        navigate(`/map/${newCenter.lat.toFixed(7)}/${newCenter.lng.toFixed(7)}`, { replace: true });
-    }, [navigate]);
+        // This is now the single source of truth for the map's position during a session.
+        try {
+            // We only store valid coordinates
+            if (newCenter && typeof newCenter.lat === 'number' && isFinite(newCenter.lat) &&
+                typeof newCenter.lng === 'number' && isFinite(newCenter.lng)) {
+                localStorage.setItem('lastKnownLocation', JSON.stringify(newCenter));
+            }
+        } catch (error) {
+            console.error("Could not write to localStorage:", error);
+        }
+    }, []);
 
     const handleZoomIn = useCallback(async () => {
         if (mapRef.current) {

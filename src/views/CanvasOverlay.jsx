@@ -131,7 +131,7 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
             }
 
             drawFog() {
-                if (!this.swPixel) return;
+                if (!this.swPixel || this.props.isAnimating) return;
 
                 this.fogCtx.clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
                 this.fogCanvas.style.opacity = this.props.isAnimating ? '0.7' : '1';
@@ -270,6 +270,8 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
             }
 
             drawDynamic() {
+                if (this.props.isAnimating) return;
+
                 const projection = this.getProjection();
                 if (!projection || !this.swPixel) return;
 
@@ -319,7 +321,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
         };
 
         // 3. Setup Map Event Listeners
-        // The 'idle' event will handle both the initial load and subsequent moves.
         const idleListener = map.addListener('idle', () => {
             if (workerRef.current) {
                 const bounds = map.getBounds();
@@ -337,7 +338,6 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
             }
         });
 
-        // --- New: Mouse event listeners for hover effect ---
         const handleMouseMove = (e) => {
             if (map.getZoom() < 15) {
                 if (hoveredCellRef.current) {
@@ -357,16 +357,17 @@ const CanvasOverlay = ({ map, zoom, claimedCells, exploredCells, hoveredCell, is
             }
         };
 
-        map.addListener('mousemove', handleMouseMove);
-        map.addListener('mouseout', handleMouseOut);
+        const mouseMoveListener = map.addListener('mousemove', handleMouseMove);
+        const mouseOutListener = map.addListener('mouseout', handleMouseOut);
         
         // 4. Cleanup
         return () => {
             worker.terminate();
             overlay.setMap(null);
-            window.google.maps.event.removeListener(idleListener);
-            window.google.maps.event.removeListener(handleMouseMove);
-            window.google.maps.event.removeListener(handleMouseOut);
+            // Correctly remove listeners using their remove() method
+            idleListener.remove();
+            mouseMoveListener.remove();
+            mouseOutListener.remove();
             if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
         };
     }, [map]); // Dependency on map ensures this runs once when map is ready

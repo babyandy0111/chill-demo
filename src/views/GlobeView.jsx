@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Globe from 'react-globe.gl';
 import { geoCentroid } from 'd3-geo';
 import * as THREE from 'three';
@@ -38,7 +38,6 @@ const styles = {
 
 const GlobeView = () => {
     const globeEl = useRef();
-    const location = useLocation();
     const [hoveredPolygon, setHoveredPolygon] = useState(null);
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
@@ -63,13 +62,21 @@ const GlobeView = () => {
 
     useEffect(() => {
         if (globeEl.current) {
-            const { state } = location;
             const transitionDuration = 2000; // 2 seconds for a smooth flight
 
-            if (state && state.lat && state.lng) {
-                // Case 1: Coming back from map view. Point to the last location.
-                globeEl.current.pointOfView({ lat: state.lat, lng: state.lng, altitude: 1.5 }, transitionDuration);
-                globeEl.current.controls().autoRotate = false;
+            // New logic: Prioritize localStorage for returning view
+            const lastKnownLocation = localStorage.getItem('lastKnownLocation');
+
+            if (lastKnownLocation) {
+                try {
+                    const { lat, lng } = JSON.parse(lastKnownLocation);
+                    // Case 1: Coming back from map view. Point to the last location.
+                    globeEl.current.pointOfView({ lat, lng, altitude: 1.5 }, transitionDuration);
+                    globeEl.current.controls().autoRotate = false;
+                } catch {
+                    // Fallback if localStorage is corrupted
+                    globeEl.current.controls().autoRotate = true;
+                }
             } else {
                 // Case 2: Initial load. Ask for GPS.
                 navigator.geolocation.getCurrentPosition(
@@ -96,7 +103,7 @@ const GlobeView = () => {
             globeEl.current.controls().minDistance = 1;
             globeEl.current.controls().maxDistance = 250;
         }
-    }, [location]);
+    }, []); // Run only once on mount
 
     const handleGlobeClick = ({ lat, lng }) => {
         if (!globeEl.current || isTransitioning) return;
@@ -112,7 +119,13 @@ const GlobeView = () => {
             setIsTransitioning(true); // Trigger fade-out CSS effect
             // A small delay for the fade-out to start before navigating
             setTimeout(() => {
-                navigate(`/map/${lat}/${lng}`);
+                // New: Save location to localStorage and navigate to the simple /map route
+                try {
+                    localStorage.setItem('lastKnownLocation', JSON.stringify({ lat, lng }));
+                } catch (error) {
+                    console.error("Could not write to localStorage:", error);
+                }
+                navigate('/map');
             }, 100);
         }, transitionDuration);
     };
