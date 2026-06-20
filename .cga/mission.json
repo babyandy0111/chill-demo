@@ -1,0 +1,16 @@
+{
+  "mission_goal": "Establish high-end visual theme and core SaaS template baseline for Pangu.",
+  "knowledge_base": {
+    "api_catalog_synced": true,
+    "project_fingerprint": {
+      "framework": "vite",
+      "module_system": "esm",
+      "src_based": true,
+      "router_mode": "react_router",
+      "alias_symbol": "@",
+      "alias_path": "./src"
+    }
+  },
+  "activity_stream": [],
+  "updated_at": "2026-06-12T12:00:00+08:00"
+}

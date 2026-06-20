@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .env
+node_modules/
+.next/
+dist/
+out/
+.shadow/
+server.log
+sync.log
+.env.local

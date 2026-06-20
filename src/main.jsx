@@ -24,7 +24,7 @@ const router = createBrowserRouter([
     element: <App />,
   },
 ], {
-  basename: "/chill-demo", // Set the basename for GitHub Pages
+  basename: "", // Set the basename for GitHub Pages
 });
 
 createRoot(document.getElementById('root')).render(
